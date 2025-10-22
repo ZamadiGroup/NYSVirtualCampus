@@ -1,13 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Router } from "express";
-import { db } from "./db";
 import { 
-  users, courses, assignments, submissions, grades, announcements, courseEnrollments,
-  insertUserSchema, insertCourseSchema, insertAssignmentSchema, insertSubmissionSchema,
-  insertGradeSchema, insertAnnouncementSchema
-} from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+  User, Course, Assignment, Submission, Grade, Announcement, Enrollment 
+} from "./mongodb";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const router = Router();
@@ -29,7 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users routes
   router.get("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     try {
-      const allUsers = await db.select().from(users);
+      const allUsers = await User.find().select('-password');
       res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -39,8 +35,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
-      const [newUser] = await db.insert(users).values(userData).returning();
+      const newUser = new User(req.body);
+      await newUser.save();
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);
@@ -51,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Courses routes
   router.get("/courses", authenticate, async (req, res) => {
     try {
-      const allCourses = await db.select().from(courses).where(eq(courses.isActive, true));
+      const allCourses = await Course.find({ isActive: true }).populate('instructorId', 'fullName');
       res.json(allCourses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -61,8 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     try {
-      const courseData = insertCourseSchema.parse(req.body);
-      const [newCourse] = await db.insert(courses).values(courseData).returning();
+      const newCourse = new Course(req.body);
+      await newCourse.save();
+      await newCourse.populate('instructorId', 'fullName');
       res.json(newCourse);
     } catch (error) {
       console.error("Error creating course:", error);
@@ -72,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.get("/courses/:id", authenticate, async (req, res) => {
     try {
-      const [course] = await db.select().from(courses).where(eq(courses.id, req.params.id));
+      const course = await Course.findById(req.params.id).populate('instructorId', 'fullName');
       if (!course) {
         return res.status(404).json({ error: "Course not found" });
       }
@@ -87,13 +84,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/assignments", authenticate, async (req, res) => {
     try {
       const { courseId } = req.query;
-      let query = db.select().from(assignments).where(eq(assignments.isActive, true));
+      let query = { isActive: true };
       
       if (courseId) {
-        query = query.where(and(eq(assignments.courseId, courseId as string), eq(assignments.isActive, true)));
+        query = { ...query, courseId };
       }
       
-      const allAssignments = await query;
+      const allAssignments = await Assignment.find(query).populate('courseId', 'title');
       res.json(allAssignments);
     } catch (error) {
       console.error("Error fetching assignments:", error);
@@ -103,8 +100,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/assignments", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     try {
-      const assignmentData = insertAssignmentSchema.parse(req.body);
-      const [newAssignment] = await db.insert(assignments).values(assignmentData).returning();
+      const newAssignment = new Assignment(req.body);
+      await newAssignment.save();
+      await newAssignment.populate('courseId', 'title');
       res.json(newAssignment);
     } catch (error) {
       console.error("Error creating assignment:", error);
@@ -115,11 +113,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.put("/assignments/:id", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     try {
       const { dueDate } = req.body;
-      const [updatedAssignment] = await db
-        .update(assignments)
-        .set({ dueDate, updatedAt: new Date() })
-        .where(eq(assignments.id, req.params.id))
-        .returning();
+      const updatedAssignment = await Assignment.findByIdAndUpdate(
+        req.params.id,
+        { dueDate },
+        { new: true }
+      );
       
       if (!updatedAssignment) {
         return res.status(404).json({ error: "Assignment not found" });
@@ -136,16 +134,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/submissions", authenticate, async (req, res) => {
     try {
       const { assignmentId, studentId } = req.query;
-      let query = db.select().from(submissions);
+      let query: any = {};
       
       if (assignmentId) {
-        query = query.where(eq(submissions.assignmentId, assignmentId as string));
+        query.assignmentId = assignmentId;
       }
       if (studentId) {
-        query = query.where(eq(submissions.studentId, studentId as string));
+        query.studentId = studentId;
       }
       
-      const allSubmissions = await query;
+      const allSubmissions = await Submission.find(query)
+        .populate('assignmentId', 'title')
+        .populate('studentId', 'fullName');
       res.json(allSubmissions);
     } catch (error) {
       console.error("Error fetching submissions:", error);
@@ -155,22 +155,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/submissions", authenticate, requireRole(["student"]), async (req, res) => {
     try {
-      const submissionData = insertSubmissionSchema.parse(req.body);
-      const [newSubmission] = await db.insert(submissions).values(submissionData).returning();
+      const newSubmission = new Submission(req.body);
+      await newSubmission.save();
       
       // Auto-grade if assignment type is "auto"
-      const [assignment] = await db.select().from(assignments).where(eq(assignments.id, submissionData.assignmentId));
+      const assignment = await Assignment.findById(req.body.assignmentId);
       if (assignment && assignment.type === "auto") {
         // Simple auto-grading logic
-        const score = Object.values(submissionData.answers || {}).filter(answer => answer.trim()).length;
-        await db.insert(grades).values({
-          assignmentId: submissionData.assignmentId,
-          studentId: submissionData.studentId,
+        const score = Object.values(req.body.answers || {}).filter((answer: any) => answer.trim()).length;
+        const newGrade = new Grade({
+          assignmentId: req.body.assignmentId,
+          studentId: req.body.studentId,
           score,
           maxScore: assignment.maxScore || 100,
           status: "graded",
           gradedAt: new Date(),
         });
+        await newGrade.save();
       }
       
       res.json(newSubmission);
@@ -184,16 +185,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/grades", authenticate, async (req, res) => {
     try {
       const { studentId, assignmentId } = req.query;
-      let query = db.select().from(grades);
+      let query: any = {};
       
       if (studentId) {
-        query = query.where(eq(grades.studentId, studentId as string));
+        query.studentId = studentId;
       }
       if (assignmentId) {
-        query = query.where(eq(grades.assignmentId, assignmentId as string));
+        query.assignmentId = assignmentId;
       }
       
-      const allGrades = await query;
+      const allGrades = await Grade.find(query)
+        .populate('assignmentId', 'title')
+        .populate('studentId', 'fullName')
+        .populate('gradedBy', 'fullName');
       res.json(allGrades);
     } catch (error) {
       console.error("Error fetching grades:", error);
@@ -204,18 +208,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.put("/grades/:id", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     try {
       const { manualScore, feedback } = req.body;
-      const [updatedGrade] = await db
-        .update(grades)
-        .set({ 
+      const updatedGrade = await Grade.findByIdAndUpdate(
+        req.params.id,
+        { 
           manualScore, 
           feedback, 
           status: "graded",
           gradedBy: req.user.id,
-          gradedAt: new Date(),
-          updatedAt: new Date()
-        })
-        .where(eq(grades.id, req.params.id))
-        .returning();
+          gradedAt: new Date()
+        },
+        { new: true }
+      );
       
       if (!updatedGrade) {
         return res.status(404).json({ error: "Grade not found" });
@@ -232,16 +235,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/announcements", authenticate, async (req, res) => {
     try {
       const { courseId, isGlobal } = req.query;
-      let query = db.select().from(announcements);
+      let query: any = {};
       
       if (courseId) {
-        query = query.where(eq(announcements.courseId, courseId as string));
+        query.courseId = courseId;
       }
       if (isGlobal === "true") {
-        query = query.where(eq(announcements.isGlobal, true));
+        query.isGlobal = true;
       }
       
-      const allAnnouncements = await query.orderBy(desc(announcements.createdAt));
+      const allAnnouncements = await Announcement.find(query)
+        .populate('authorId', 'fullName')
+        .populate('courseId', 'title')
+        .sort({ createdAt: -1 });
       res.json(allAnnouncements);
     } catch (error) {
       console.error("Error fetching announcements:", error);
@@ -251,8 +257,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/announcements", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     try {
-      const announcementData = insertAnnouncementSchema.parse(req.body);
-      const [newAnnouncement] = await db.insert(announcements).values(announcementData).returning();
+      const newAnnouncement = new Announcement(req.body);
+      await newAnnouncement.save();
+      await newAnnouncement.populate('authorId', 'fullName');
       res.json(newAnnouncement);
     } catch (error) {
       console.error("Error creating announcement:", error);
@@ -264,10 +271,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/enrollments", authenticate, requireRole(["student"]), async (req, res) => {
     try {
       const { courseId } = req.body;
-      const [enrollment] = await db.insert(courseEnrollments).values({
+      const enrollment = new Enrollment({
         courseId,
         studentId: req.user.id,
-      }).returning();
+      });
+      await enrollment.save();
       res.json(enrollment);
     } catch (error) {
       console.error("Error enrolling in course:", error);
@@ -278,16 +286,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin dashboard data
   router.get("/admin/dashboard", authenticate, requireRole(["admin"]), async (req, res) => {
     try {
-      const [userCount] = await db.select({ count: sql`count(*)` }).from(users);
-      const [courseCount] = await db.select({ count: sql`count(*)` }).from(courses);
-      const [assignmentCount] = await db.select({ count: sql`count(*)` }).from(assignments);
-      const [submissionCount] = await db.select({ count: sql`count(*)` }).from(submissions);
+      const userCount = await User.countDocuments();
+      const courseCount = await Course.countDocuments();
+      const assignmentCount = await Assignment.countDocuments();
+      const submissionCount = await Submission.countDocuments();
       
       res.json({
-        users: userCount.count,
-        courses: courseCount.count,
-        assignments: assignmentCount.count,
-        submissions: submissionCount.count,
+        users: userCount,
+        courses: courseCount,
+        assignments: assignmentCount,
+        submissions: submissionCount,
       });
     } catch (error) {
       console.error("Error fetching admin dashboard data:", error);

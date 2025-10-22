@@ -1,16 +1,16 @@
 # Database Setup Guide
 
-## PostgreSQL Integration
+## MongoDB Atlas Integration
 
-This project now uses PostgreSQL with Drizzle ORM for all data persistence. Here's what has been implemented:
+This project now uses MongoDB Atlas with Mongoose ODM for all data persistence. Here's what has been implemented:
 
 ### Database Schema
 
-The following tables have been created:
+The following collections have been created:
 
 1. **users** - User accounts with roles (student, tutor, admin)
-2. **courses** - Course information with JSON fields for resources, outline, etc.
-3. **course_enrollments** - Student enrollments in courses
+2. **courses** - Course information with embedded documents for resources, outline, etc.
+3. **enrollments** - Student enrollments in courses
 4. **assignments** - Assignments with questions, due dates, and types (auto/upload)
 5. **submissions** - Student assignment submissions
 6. **grades** - Grading records with auto and manual scoring
@@ -31,22 +31,22 @@ All CRUD operations are available via REST API:
 
 ### Setup Instructions
 
-1. **Set up PostgreSQL database** (Neon, Supabase, or local PostgreSQL)
+1. **Set up MongoDB Atlas database**:
+   - Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/atlas)
+   - Create a database user with read/write permissions
+   - Whitelist your IP address (or use 0.0.0.0/0 for development)
 
 2. **Set environment variable**:
    ```bash
-   DATABASE_URL="postgresql://username:password@host:port/database"
+   MONGODB_URI="mongodb+srv://username:password@cluster.mongodb.net/nys-virtual-campus?retryWrites=true&w=majority"
    ```
 
-3. **Push schema to database**:
-   ```bash
-   npm run db:push
-   ```
-
-4. **Start the application**:
+3. **Start the application**:
    ```bash
    npm run dev
    ```
+
+4. **CORS is enabled** for frontend communication on ports 3000, 5173, and 5000
 
 ### Features Implemented
 
@@ -77,4 +77,4 @@ Currently using simplified demo authentication. In production, implement:
 5. **Admins** monitor all activities
 6. **Everyone** can post/view announcements
 
-The system now provides a complete learning management platform with persistent data storage and proper API architecture.
+The system now provides a complete learning management platform with MongoDB Atlas integration, CORS-enabled API, and proper data persistence.
