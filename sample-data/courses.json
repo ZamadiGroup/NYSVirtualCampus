@@ -1,0 +1,82 @@
+[
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439021"},
+    "title": "Introduction to Computer Science",
+    "description": "A comprehensive introduction to computer science fundamentals including programming, algorithms, and data structures.",
+    "department": "Technology",
+    "instructorId": {"$oid": "507f1f77bcf86cd799439012"},
+    "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400",
+    "notes": "This course covers basic programming concepts and problem-solving techniques.",
+    "pptLinks": [
+      "https://example.com/ppt1.pdf",
+      "https://example.com/ppt2.pdf"
+    ],
+    "resources": [
+      {
+        "url": "https://www.w3schools.com",
+        "label": "W3Schools Tutorial"
+      },
+      {
+        "url": "https://www.codecademy.com",
+        "label": "Codecademy"
+      }
+    ],
+    "attachments": [
+      "https://example.com/syllabus.pdf",
+      "https://example.com/reading-list.pdf"
+    ],
+    "tags": ["programming", "beginner", "computer-science"],
+    "estimatedDuration": "12 weeks",
+    "outline": [
+      {
+        "title": "Introduction to Programming",
+        "description": "Basic programming concepts and syntax"
+      },
+      {
+        "title": "Data Structures",
+        "description": "Arrays, lists, and basic data organization"
+      }
+    ],
+    "enrollmentKey": "CS1012024",
+    "isActive": true,
+    "createdAt": {"$date": "2024-01-20T08:00:00.000Z"},
+    "updatedAt": {"$date": "2024-01-20T08:00:00.000Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439022"},
+    "title": "Business Management Fundamentals",
+    "description": "Essential business management principles and practices for modern organizations.",
+    "department": "Business",
+    "instructorId": {"$oid": "507f1f77bcf86cd799439014"},
+    "thumbnail": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
+    "notes": "Focus on practical business applications and case studies.",
+    "pptLinks": [
+      "https://example.com/business-ppt1.pdf"
+    ],
+    "resources": [
+      {
+        "url": "https://www.hbr.org",
+        "label": "Harvard Business Review"
+      }
+    ],
+    "attachments": [
+      "https://example.com/business-syllabus.pdf"
+    ],
+    "tags": ["business", "management", "leadership"],
+    "estimatedDuration": "10 weeks",
+    "outline": [
+      {
+        "title": "Introduction to Management",
+        "description": "Basic management principles and theories"
+      },
+      {
+        "title": "Strategic Planning",
+        "description": "Developing and implementing business strategies"
+      }
+    ],
+    "enrollmentKey": "BM1012024",
+    "isActive": true,
+    "createdAt": {"$date": "2024-01-21T09:00:00.000Z"},
+    "updatedAt": {"$date": "2024-01-21T09:00:00.000Z"}
+  }
+]

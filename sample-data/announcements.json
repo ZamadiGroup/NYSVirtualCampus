@@ -1,0 +1,35 @@
+[
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439071"},
+    "title": "Welcome to NYS Virtual Campus",
+    "content": "Welcome to the National Youth Service Virtual Campus! We're excited to have you join our learning community. Please take time to explore the platform and familiarize yourself with the available courses.",
+    "authorId": {"$oid": "507f1f77bcf86cd799439011"},
+    "courseId": null,
+    "priority": "normal",
+    "isActive": true,
+    "createdAt": {"$date": "2024-01-15T08:00:00.000Z"},
+    "updatedAt": {"$date": "2024-01-15T08:00:00.000Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439072"},
+    "title": "Programming Assignment Due Soon",
+    "content": "Reminder: The Programming Basics Assignment is due on February 15th, 2024. Please ensure you submit your work on time to avoid late penalties.",
+    "authorId": {"$oid": "507f1f77bcf86cd799439012"},
+    "courseId": {"$oid": "507f1f77bcf86cd799439021"},
+    "priority": "high",
+    "isActive": true,
+    "createdAt": {"$date": "2024-02-01T09:00:00.000Z"},
+    "updatedAt": {"$date": "2024-02-01T09:00:00.000Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439073"},
+    "title": "Business Management Course Update",
+    "content": "The Business Management Fundamentals course has been updated with new resources and case studies. Please check the course materials section for the latest content.",
+    "authorId": {"$oid": "507f1f77bcf86cd799439014"},
+    "courseId": {"$oid": "507f1f77bcf86cd799439022"},
+    "priority": "normal",
+    "isActive": true,
+    "createdAt": {"$date": "2024-02-05T11:00:00.000Z"},
+    "updatedAt": {"$date": "2024-02-05T11:00:00.000Z"}
+  }
+]

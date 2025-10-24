@@ -1,0 +1,34 @@
+[
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439041"},
+    "title": "Programming Basics Assignment",
+    "description": "Create a simple calculator program using Python. The program should perform basic arithmetic operations.",
+    "courseId": {"$oid": "507f1f77bcf86cd799439021"},
+    "instructorId": {"$oid": "507f1f77bcf86cd799439012"},
+    "dueDate": {"$date": "2024-02-15T23:59:59.000Z"},
+    "maxPoints": 100,
+    "instructions": "Submit your Python code file (.py) with proper comments and error handling.",
+    "attachments": [
+      "https://example.com/assignment-guidelines.pdf"
+    ],
+    "isActive": true,
+    "createdAt": {"$date": "2024-01-25T08:00:00.000Z"},
+    "updatedAt": {"$date": "2024-01-25T08:00:00.000Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439042"},
+    "title": "Business Case Study Analysis",
+    "description": "Analyze the provided business case study and provide recommendations for improvement.",
+    "courseId": {"$oid": "507f1f77bcf86cd799439022"},
+    "instructorId": {"$oid": "507f1f77bcf86cd799439014"},
+    "dueDate": {"$date": "2024-02-20T23:59:59.000Z"},
+    "maxPoints": 150,
+    "instructions": "Write a 2000-word analysis report with proper citations and recommendations.",
+    "attachments": [
+      "https://example.com/case-study.pdf"
+    ],
+    "isActive": true,
+    "createdAt": {"$date": "2024-01-26T09:00:00.000Z"},
+    "updatedAt": {"$date": "2024-01-26T09:00:00.000Z"}
+  }
+]

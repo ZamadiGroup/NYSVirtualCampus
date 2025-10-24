@@ -1,0 +1,28 @@
+[
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439061"},
+    "submissionId": {"$oid": "507f1f77bcf86cd799439051"},
+    "assignmentId": {"$oid": "507f1f77bcf86cd799439041"},
+    "studentId": {"$oid": "507f1f77bcf86cd799439013"},
+    "instructorId": {"$oid": "507f1f77bcf86cd799439012"},
+    "points": 85,
+    "maxPoints": 100,
+    "feedback": "Good implementation with proper error handling. Consider adding more advanced features for extra credit.",
+    "gradedAt": {"$date": "2024-02-12T10:00:00.000Z"},
+    "createdAt": {"$date": "2024-02-12T10:00:00.000Z"},
+    "updatedAt": {"$date": "2024-02-12T10:00:00.000Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439062"},
+    "submissionId": {"$oid": "507f1f77bcf86cd799439052"},
+    "assignmentId": {"$oid": "507f1f77bcf86cd799439042"},
+    "studentId": {"$oid": "507f1f77bcf86cd799439015"},
+    "instructorId": {"$oid": "507f1f77bcf86cd799439014"},
+    "points": 140,
+    "maxPoints": 150,
+    "feedback": "Excellent analysis with well-structured recommendations. Good use of business frameworks and theories.",
+    "gradedAt": {"$date": "2024-02-22T14:30:00.000Z"},
+    "createdAt": {"$date": "2024-02-22T14:30:00.000Z"},
+    "updatedAt": {"$date": "2024-02-22T14:30:00.000Z"}
+  }
+]
