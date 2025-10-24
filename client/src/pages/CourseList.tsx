@@ -8,7 +8,11 @@ import businessThumbnail from "@assets/generated_images/Business_course_thumbnai
 import engineeringThumbnail from "@assets/generated_images/Engineering_course_thumbnail_06f884c3.png";
 import healthcareThumbnail from "@assets/generated_images/Healthcare_course_thumbnail_5609d386.png";
 
-export default function CourseList() {
+interface CourseListProps {
+  userRole?: "student" | "tutor" | "admin";
+}
+
+export default function CourseList({ userRole = "student" }: CourseListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
 
@@ -115,7 +119,11 @@ export default function CourseList() {
           <CourseCard
             key={course.id}
             {...course}
-            onEnroll={() => console.log(`Enroll in ${course.title}`)}
+            userRole={userRole}
+            onEnroll={(enrollmentKey) => {
+              console.log(`Enroll in ${course.title} with key: ${enrollmentKey}`);
+              // TODO: Implement actual enrollment API call
+            }}
           />
         ))}
       </div>

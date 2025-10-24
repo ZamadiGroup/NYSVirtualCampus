@@ -45,6 +45,7 @@ const courseSchema = new mongoose.Schema({
     title: { type: String },
     description: { type: String }
   }],
+  enrollmentKey: { type: String, required: true, unique: true },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

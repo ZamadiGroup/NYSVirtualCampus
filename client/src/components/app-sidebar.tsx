@@ -65,7 +65,7 @@ export function AppSidebar({ userRole, userName, onNavigate, currentPage }: AppS
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
-          <img src={nysLogo} alt="NYS Kenya" className="h-10 w-10" />
+          <img src={nysLogo} alt="NYS Kenya" className="h-14 w-14 flex-shrink-0" />
           <div>
             <h2 className="font-bold text-lg text-primary">NYS Campus</h2>
             <p className="text-xs text-muted-foreground">Virtual Learning</p>

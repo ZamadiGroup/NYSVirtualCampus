@@ -1,36 +1,144 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { 
   User, Course, Assignment, Submission, Grade, Announcement, Enrollment 
 } from "./mongodb";
+import { 
+  generateToken, 
+  verifyToken, 
+  extractTokenFromHeader, 
+  type AuthenticatedRequest,
+  type JWTPayload 
+} from "./jwt";
+import { nanoid } from "nanoid";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const router = Router();
 
-  // Authentication middleware (simplified for demo)
-  const authenticate = (req: any, res: any, next: any) => {
-    // In a real app, you'd verify JWT tokens or session
-    const allowedRoles = ["student", "tutor", "admin"] as const;
-    const headerRole = (req.headers["x-role"] as string | undefined)?.toLowerCase();
-    const isAllowedHeaderRole = headerRole && allowedRoles.includes(headerRole as any);
+  // JWT Authentication middleware
+  const authenticate = (req: AuthenticatedRequest, res: any, next: any) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = extractTokenFromHeader(authHeader);
+      
+      if (!token) {
+        return res.status(401).json({ error: "No token provided" });
+      }
 
-    // In development, default to admin to make it easier to test protected routes
-    const defaultRole = app.get("env") === "development" ? "admin" : "student";
+      const decoded = verifyToken(token);
+      if (!decoded) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
 
-    req.user = { id: "demo-user", role: (isAllowedHeaderRole ? headerRole : defaultRole) };
-    next();
+      req.user = decoded;
+      next();
+    } catch (error) {
+      console.error("Authentication error:", error);
+      return res.status(401).json({ error: "Authentication failed" });
+    }
   };
 
-  const requireRole = (roles: string[]) => (req: any, res: any, next: any) => {
+  const requireRole = (roles: string[]) => (req: AuthenticatedRequest, res: any, next: any) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
     next();
   };
 
+  // Authentication routes
+  router.post("/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      // Find user by email
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // In a real app, you'd verify the password hash
+      // For demo purposes, we'll just check if password matches
+      if (user.password !== password) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Generate JWT token
+      const token = generateToken({
+        userId: user._id.toString(),
+        role: user.role,
+        email: user.email,
+        fullName: user.fullName
+      });
+
+      res.json({
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  router.post("/auth/register", async (req, res) => {
+    try {
+      const { email, password, fullName, role = "student" } = req.body;
+      
+      if (!email || !password || !fullName) {
+        return res.status(400).json({ error: "Email, password, and full name are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists" });
+      }
+
+      // Create new user
+      const newUser = new User({
+        email,
+        password, // In production, hash this password
+        fullName,
+        role
+      });
+
+      await newUser.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        userId: newUser._id.toString(),
+        role: newUser.role,
+        email: newUser.email,
+        fullName: newUser.fullName
+      });
+
+      res.status(201).json({
+        token,
+        user: {
+          id: newUser._id,
+          email: newUser.email,
+          fullName: newUser.fullName,
+          role: newUser.role
+        }
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
   // Users routes
-  router.get("/users", authenticate, requireRole(["admin"]), async (req, res) => {
+  router.get("/users", authenticate, requireRole(["admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const allUsers = await User.find().select('-password');
       res.json(allUsers);
@@ -40,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.post("/users", authenticate, requireRole(["admin"]), async (req, res) => {
+  router.post("/users", authenticate, requireRole(["admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const newUser = new User(req.body);
       await newUser.save();
@@ -52,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Courses routes
-  router.get("/courses", authenticate, async (req, res) => {
+  router.get("/courses", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const allCourses = await Course.find({ isActive: true }).populate('instructorId', 'fullName');
       res.json(allCourses);
@@ -62,9 +170,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+  router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const newCourse = new Course(req.body);
+      // Generate a unique enrollment key
+      const enrollmentKey = nanoid(8).toUpperCase();
+      
+      const newCourse = new Course({
+        ...req.body,
+        enrollmentKey
+      });
       await newCourse.save();
       await newCourse.populate('instructorId', 'fullName');
       res.json(newCourse);
@@ -74,27 +188,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.get("/courses/:id", authenticate, async (req, res) => {
+  router.get("/courses/:id", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const course = await Course.findById(req.params.id).populate('instructorId', 'fullName');
       if (!course) {
         return res.status(404).json({ error: "Course not found" });
       }
-      res.json(course);
+      
+      // Only show enrollment key to tutors and admins
+      const response = course.toObject();
+      if (req.user.role !== 'student') {
+        response.enrollmentKey = course.enrollmentKey;
+      } else {
+        delete response.enrollmentKey;
+      }
+      
+      res.json(response);
     } catch (error) {
       console.error("Error fetching course:", error);
       res.status(500).json({ error: "Failed to fetch course" });
     }
   });
 
+  // Generate new enrollment key for a course
+  router.post("/courses/:id/regenerate-key", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const course = await Course.findById(req.params.id);
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      // Check if the user is the instructor or admin
+      if (req.user.role !== 'admin' && course.instructorId.toString() !== req.user.userId) {
+        return res.status(403).json({ error: "Only the course instructor or admin can regenerate the key" });
+      }
+
+      const newEnrollmentKey = nanoid(8).toUpperCase();
+      course.enrollmentKey = newEnrollmentKey;
+      await course.save();
+
+      res.json({ enrollmentKey: newEnrollmentKey });
+    } catch (error) {
+      console.error("Error regenerating enrollment key:", error);
+      res.status(500).json({ error: "Failed to regenerate enrollment key" });
+    }
+  });
+
   // Assignments routes
-  router.get("/assignments", authenticate, async (req, res) => {
+  router.get("/assignments", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { courseId } = req.query;
       let query = { isActive: true };
       
       if (courseId) {
-        query = { ...query, courseId };
+        query = { ...query, courseId: courseId as string } as any;
       }
       
       const allAssignments = await Assignment.find(query).populate('courseId', 'title');
@@ -105,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.post("/assignments", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+  router.post("/assignments", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const newAssignment = new Assignment(req.body);
       await newAssignment.save();
@@ -117,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.put("/assignments/:id", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+  router.put("/assignments/:id", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { dueDate } = req.body;
       const updatedAssignment = await Assignment.findByIdAndUpdate(
@@ -138,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Submissions routes
-  router.get("/submissions", authenticate, async (req, res) => {
+  router.get("/submissions", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { assignmentId, studentId } = req.query;
       let query: any = {};
@@ -160,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.post("/submissions", authenticate, requireRole(["student"]), async (req, res) => {
+  router.post("/submissions", authenticate, requireRole(["student"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const newSubmission = new Submission(req.body);
       await newSubmission.save();
@@ -189,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Grades routes
-  router.get("/grades", authenticate, async (req, res) => {
+  router.get("/grades", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { studentId, assignmentId } = req.query;
       let query: any = {};
@@ -212,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.put("/grades/:id", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+  router.put("/grades/:id", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { manualScore, feedback } = req.body;
       const updatedGrade = await Grade.findByIdAndUpdate(
@@ -221,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           manualScore, 
           feedback, 
           status: "graded",
-          gradedBy: req.user.id,
+          gradedBy: req.user.userId,
           gradedAt: new Date()
         },
         { new: true }
@@ -239,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Announcements routes
-  router.get("/announcements", authenticate, async (req, res) => {
+  router.get("/announcements", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { courseId, isGlobal } = req.query;
       let query: any = {};
@@ -262,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.post("/announcements", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+  router.post("/announcements", authenticate, requireRole(["tutor", "admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const newAnnouncement = new Announcement(req.body);
       await newAnnouncement.save();
@@ -275,12 +422,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Course enrollments
-  router.post("/enrollments", authenticate, requireRole(["student"]), async (req, res) => {
+  router.post("/enrollments", authenticate, requireRole(["student"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { courseId } = req.body;
+      const { courseId, enrollmentKey } = req.body;
+      
+      if (!courseId || !enrollmentKey) {
+        return res.status(400).json({ error: "Course ID and enrollment key are required" });
+      }
+
+      // Find the course and verify the enrollment key
+      const course = await Course.findById(courseId);
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      if (course.enrollmentKey !== enrollmentKey) {
+        return res.status(400).json({ error: "Invalid enrollment key" });
+      }
+
+      // Check if student is already enrolled
+      const existingEnrollment = await Enrollment.findOne({
+        courseId,
+        studentId: req.user.userId
+      });
+
+      if (existingEnrollment) {
+        return res.status(400).json({ error: "Already enrolled in this course" });
+      }
+
       const enrollment = new Enrollment({
         courseId,
-        studentId: req.user.id,
+        studentId: req.user.userId,
       });
       await enrollment.save();
       res.json(enrollment);
@@ -291,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin dashboard data
-  router.get("/admin/dashboard", authenticate, requireRole(["admin"]), async (req, res) => {
+  router.get("/admin/dashboard", authenticate, requireRole(["admin"]), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userCount = await User.countDocuments();
       const courseCount = await Course.countDocuments();

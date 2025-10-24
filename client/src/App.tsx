@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import nysLogo from "@assets/generated_images/NYS_Kenya_official_logo_4530e265.png";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,8 +82,9 @@ function App() {
             <AppSidebar userRole={currentView} userName={userNames[currentView]} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
             <div className="flex flex-col flex-1 overflow-hidden">
               <header className="flex items-center justify-between gap-4 p-4 border-b-2 border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-green-800" />
+                  <img src={nysLogo} alt="NYS Kenya" className="h-12 w-12 hidden md:block flex-shrink-0" />
                   <div className="hidden md:block">
                     <h2 className="font-bold text-lg text-white">NYS Virtual Campus</h2>
                     <p className="text-sm text-green-100">National Youth Service Kenya</p>
@@ -153,7 +155,7 @@ function App() {
                     </>
                   )}
 
-                  {currentPage === "courses" && <CourseList />}
+                  {currentPage === "courses" && <CourseList userRole={currentView} />}
                   {currentPage === "course-detail" && <CourseDetail />}
                   {currentView === "tutor" && currentPage === "create-course" && (
                     <CreateCourse

@@ -89,6 +89,7 @@ export default function TutorDashboard({ onNavigate }: TutorDashboardProps) {
             department="Technology"
             enrolledCount={145}
             isEnrolled={false}
+            userRole="tutor"
             onEnroll={() => console.log("Manage course")}
           />
           <CourseCard
@@ -99,6 +100,7 @@ export default function TutorDashboard({ onNavigate }: TutorDashboardProps) {
             department="Technology"
             enrolledCount={89}
             isEnrolled={false}
+            userRole="tutor"
             onEnroll={() => console.log("Manage course")}
           />
         </div>

@@ -78,6 +78,7 @@ export default function StudentDashboard() {
               enrolledCount={145}
               progress={65}
               isEnrolled={true}
+              userRole="student"
               onContinue={() => console.log("Continue course")}
             />
             <CourseCard
@@ -89,6 +90,7 @@ export default function StudentDashboard() {
               enrolledCount={98}
               progress={45}
               isEnrolled={true}
+              userRole="student"
               onContinue={() => console.log("Continue course")}
             />
             <CourseCard
@@ -100,6 +102,7 @@ export default function StudentDashboard() {
               enrolledCount={76}
               progress={30}
               isEnrolled={true}
+              userRole="student"
               onContinue={() => console.log("Continue course")}
             />
           </div>

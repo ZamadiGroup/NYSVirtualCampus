@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, GraduationCap, TrendingUp, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AddUserDialog } from "@/components/AddUserDialog";
+import { AddCourseDialog } from "@/components/AddCourseDialog";
 
 export default function AdminDashboard() {
   return (
@@ -18,14 +20,8 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" data-testid="button-add-user">
-            <Plus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
-          <Button data-testid="button-add-course">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Course
-          </Button>
+          <AddUserDialog onUserAdded={() => console.log('User added successfully')} />
+          <AddCourseDialog onCourseAdded={() => console.log('Course added successfully')} />
         </div>
       </div>
 

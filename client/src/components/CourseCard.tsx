@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Users, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { BookOpen, Users, Clock, Key } from "lucide-react";
 
 interface CourseCardProps {
   id: string;
@@ -13,7 +16,8 @@ interface CourseCardProps {
   enrolledCount: number;
   progress?: number;
   isEnrolled?: boolean;
-  onEnroll?: () => void;
+  userRole?: "student" | "tutor" | "admin";
+  onEnroll?: (enrollmentKey?: string) => void;
   onContinue?: () => void;
 }
 
@@ -25,9 +29,20 @@ export function CourseCard({
   enrolledCount,
   progress,
   isEnrolled = false,
+  userRole = "student",
   onEnroll,
   onContinue,
 }: CourseCardProps) {
+  const [enrollmentKey, setEnrollmentKey] = useState("");
+  const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+
+  const handleEnroll = () => {
+    if (onEnroll) {
+      onEnroll(enrollmentKey);
+      setIsEnrollDialogOpen(false);
+      setEnrollmentKey("");
+    }
+  };
   return (
     <Card className="overflow-hidden hover-elevate" data-testid={`card-course-${title}`}>
       <div className="aspect-video w-full overflow-hidden bg-muted">
@@ -76,15 +91,59 @@ export function CourseCard({
           >
             Continue Learning
           </Button>
+        ) : userRole === "student" ? (
+          <Dialog open={isEnrollDialogOpen} onOpenChange={setIsEnrollDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full"
+                data-testid="button-enroll-course"
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Enroll with Key
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Enroll in {title}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter the enrollment key provided by your instructor to join this course.
+                </p>
+                <div className="space-y-2">
+                  <label htmlFor="enrollment-key" className="text-sm font-medium">
+                    Enrollment Key
+                  </label>
+                  <Input
+                    id="enrollment-key"
+                    placeholder="Enter enrollment key"
+                    value={enrollmentKey}
+                    onChange={(e) => setEnrollmentKey(e.target.value.toUpperCase())}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEnrollDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleEnroll}
+                    disabled={!enrollmentKey.trim()}
+                  >
+                    Enroll
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         ) : (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={onEnroll}
-            data-testid="button-enroll-course"
-          >
-            Enroll Now
-          </Button>
+          <div className="w-full text-center text-sm text-muted-foreground py-2">
+            {userRole === "tutor" ? "You are the instructor" : "Admin access"}
+          </div>
         )}
       </CardFooter>
     </Card>
