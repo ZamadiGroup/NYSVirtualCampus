@@ -17,8 +17,10 @@ interface CourseCardProps {
   progress?: number;
   isEnrolled?: boolean;
   userRole?: "student" | "tutor" | "admin";
-  onEnroll?: (enrollmentKey?: string) => void;
+  onEnroll?: () => void;
   onContinue?: () => void;
+  onManageEnrollment?: () => void;
+  children?: React.ReactNode;
 }
 
 export function CourseCard({
@@ -32,15 +34,15 @@ export function CourseCard({
   userRole = "student",
   onEnroll,
   onContinue,
+  onManageEnrollment,
+  children,
 }: CourseCardProps) {
-  const [enrollmentKey, setEnrollmentKey] = useState("");
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
 
   const handleEnroll = () => {
     if (onEnroll) {
-      onEnroll(enrollmentKey);
+      onEnroll();
       setIsEnrollDialogOpen(false);
-      setEnrollmentKey("");
     }
   };
   return (
@@ -92,58 +94,27 @@ export function CourseCard({
             Continue Learning
           </Button>
         ) : userRole === "student" ? (
-          <Dialog open={isEnrollDialogOpen} onOpenChange={setIsEnrollDialogOpen}>
-            <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={onEnroll}
+            data-testid="button-enroll-course"
+          >
+            Enroll in Course
+          </Button>
+        ) : (
+          <>
+            {children || (
               <Button
                 variant="outline"
                 className="w-full"
-                data-testid="button-enroll-course"
+                onClick={onManageEnrollment}
+                data-testid="button-manage-enrollment"
               >
-                <Key className="w-4 h-4 mr-2" />
-                Enroll with Key
+                {userRole === "tutor" ? "Manage Enrollments" : "Manage Enrollments"}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Enroll in {title}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Enter the enrollment key provided by your instructor to join this course.
-                </p>
-                <div className="space-y-2">
-                  <label htmlFor="enrollment-key" className="text-sm font-medium">
-                    Enrollment Key
-                  </label>
-                  <Input
-                    id="enrollment-key"
-                    placeholder="Enter enrollment key"
-                    value={enrollmentKey}
-                    onChange={(e) => setEnrollmentKey(e.target.value.toUpperCase())}
-                    className="font-mono"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsEnrollDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleEnroll}
-                    disabled={!enrollmentKey.trim()}
-                  >
-                    Enroll
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <div className="w-full text-center text-sm text-muted-foreground py-2">
-            {userRole === "tutor" ? "You are the instructor" : "Admin access"}
-          </div>
+            )}
+          </>
         )}
       </CardFooter>
     </Card>

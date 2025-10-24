@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { PlanNotificationProvider } from "@/components/PlanNotification";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import nysLogo from "@assets/generated_images/NYS_Kenya_official_logo_4530e265.png";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +32,7 @@ function App() {
   const [currentView, setCurrentView] = useState<"student" | "tutor" | "admin">("student");
   const [currentPage, setCurrentPage] = useState<
     | "homepage"
-    | "dashboard"
+    | "dashboard" 
     | "courses"
     | "course-detail"
     | "assignments"
@@ -47,7 +48,6 @@ function App() {
     | "admin-uploads"
     | "manage-assignments"
     | "tutor-grades"
-    | "announcements"
   >("homepage");
 
   // In-memory demo state for assignments, submissions, grades, and admin visibility
@@ -77,11 +77,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar userRole={currentView} userName={userNames[currentView]} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between gap-4 p-4 border-b-2 border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
+        <PlanNotificationProvider>
+          <SidebarProvider style={style as React.CSSProperties}>
+            <div className="flex h-screen w-full">
+              <AppSidebar userRole={currentView} userName={userNames[currentView]} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <header className="flex items-center justify-between gap-4 p-4 border-b-2 border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
                 <div className="flex items-center gap-3">
                   <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-green-800" />
                   <img src={nysLogo} alt="NYS Kenya" className="h-12 w-12 hidden md:block flex-shrink-0" />
@@ -452,11 +453,13 @@ function App() {
               </div>
             </div>
           </div>
+          <Toaster />
         </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+      </PlanNotificationProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
   );
 }
+
 
 export default App;
