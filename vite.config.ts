@@ -30,6 +30,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      external: (id) => {
+        // Don't externalize any dependencies for client build
+        return false;
+      },
+    },
   },
   server: {
     fs: {
