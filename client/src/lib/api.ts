@@ -4,11 +4,18 @@ const API_BASE = '/api';
 
 // Generic API call function
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // Attach Authorization header automatically when a token exists
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
     ...options,
   });
 
@@ -23,20 +30,33 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 // Users API
 export const usersApi = {
   getAll: () => apiCall('/users'),
+  getByRole: (role: string) => apiCall(`/users?role=${encodeURIComponent(role)}`),
   create: (userData: any) => apiCall('/users', {
     method: 'POST',
     body: JSON.stringify(userData),
   }),
+  graduate: (id: string) => apiCall(`/users/${id}/graduate`, { method: 'POST' }),
 };
 
 // Courses API
 export const coursesApi = {
   getAll: () => apiCall('/courses'),
+  getMine: () => apiCall('/courses/my'),
+  getAvailable: () => apiCall('/courses/available'),
   getById: (id: string) => apiCall(`/courses/${id}`),
   create: (courseData: any) => apiCall('/courses', {
     method: 'POST',
     body: JSON.stringify(courseData),
   }),
+  update: (id: string, courseData: any) => apiCall(`/courses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(courseData),
+  }),
+  enroll: (id: string, enrollEmails: string[]) => apiCall(`/courses/${id}/enroll`, {
+    method: 'POST',
+    body: JSON.stringify({ enrollEmails }),
+  }),
+  getMyEnrollments: () => apiCall('/courses'),
 };
 
 // Assignments API
@@ -138,7 +158,8 @@ export type ApiCourse = {
   attachments: string[];
   tags: string[];
   estimatedDuration?: string;
-  outline: Array<{title: string, description: string}>;
+    chapters?: Array<{ title?: string; description?: string; materials?: Array<{ type?: string; url?: string; label?: string }> }>;
+    enrollEmails?: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

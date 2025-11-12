@@ -3,6 +3,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import path from 'path';
+import fs from 'fs';
 import { connectDB } from "./mongodb";
 
 const app = express();
@@ -60,6 +62,15 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   } else {
     serveStatic(app);
+  }
+
+  // Ensure uploads directory exists and serve it at /uploads
+  try {
+    const uploadsDir = path.resolve(import.meta.dirname, '..', 'attached_assets', 'uploads');
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    app.use('/uploads', express.static(uploadsDir));
+  } catch (err) {
+    log(`Failed to setup uploads static dir: ${err}`);
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

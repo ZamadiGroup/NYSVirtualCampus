@@ -5,7 +5,8 @@ export default function AppSidebarExample() {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full">
-        <AppSidebar userRole="student" userName="John Doe" />
+        {/* Provide required props for the example */}
+        <AppSidebar userRole="student" userName="John Doe" onNavigate={() => {}} currentPage="homepage" />
       </div>
     </SidebarProvider>
   );

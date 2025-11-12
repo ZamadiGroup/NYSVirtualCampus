@@ -51,7 +51,7 @@ export default function Announcements({ items, canPost, authorRole, authorName, 
                       isGlobal: true,
                     };
                     
-                    const newAnnouncement = await announcementsApi.create(announcementData);
+                    const newAnnouncement: any = await announcementsApi.create(announcementData);
                     const a: Announcement = {
                       id: newAnnouncement.id,
                       message: newAnnouncement.message,

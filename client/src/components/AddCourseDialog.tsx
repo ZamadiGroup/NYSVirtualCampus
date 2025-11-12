@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, BookOpen, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { coursesApi } from "@/lib/api";
 
 interface AddCourseDialogProps {
   onCourseAdded?: () => void;
@@ -52,17 +53,24 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
         // The server will generate the enrollment key automatically
       };
 
-      const response = await fetch('/api/courses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(courseData),
-      });
+      // Ensure user is authenticated before calling API
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      if (!token) {
+        toast({
+          title: "Not authenticated",
+          description: "You must be logged in as a tutor or admin to add courses.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
 
-      if (response.ok) {
-        const newCourse = await response.json();
+      try {
+        // use centralized API helper which attaches auth headers
+        const newCourse: any = await coursesApi.create({
+          ...courseData,
+        });
+
         toast({
           title: "Course Created Successfully",
           description: `${formData.title} has been created with enrollment key: ${newCourse.enrollmentKey}`,
@@ -79,11 +87,11 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
           tags: '',
         });
         onCourseAdded?.();
-      } else {
-        const error = await response.json();
+      } catch (err: any) {
+        const message = err?.message || 'Failed to create course';
         toast({
           title: "Error Creating Course",
-          description: error.error || "Failed to create course. Please try again.",
+          description: message,
           variant: "destructive",
         });
       }
@@ -164,13 +172,12 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
             <Label htmlFor="instructorId">Instructor ID</Label>
             <Input
               id="instructorId"
-              placeholder="Enter instructor user ID"
+              placeholder="Enter instructor user ID (optional)"
               value={formData.instructorId}
               onChange={(e) => handleInputChange('instructorId', e.target.value)}
-              required
             />
             <p className="text-xs text-muted-foreground">
-              Enter the user ID of the instructor who will teach this course
+              Enter the user ID of the instructor who will teach this course (leave empty to set yourself)
             </p>
           </div>
 

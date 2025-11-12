@@ -17,7 +17,7 @@ interface CourseCardProps {
   progress?: number;
   isEnrolled?: boolean;
   userRole?: "student" | "tutor" | "admin";
-  onEnroll?: () => void;
+  onEnroll?: (enrollmentKey?: string) => void;
   onContinue?: () => void;
   onManageEnrollment?: () => void;
   children?: React.ReactNode;
@@ -45,6 +45,8 @@ export function CourseCard({
       setIsEnrollDialogOpen(false);
     }
   };
+  const isManager = userRole === "tutor" || userRole === "admin";
+
   return (
     <Card className="overflow-hidden hover-elevate" data-testid={`card-course-${title}`}>
       <div className="aspect-video w-full overflow-hidden bg-muted">
@@ -97,24 +99,33 @@ export function CourseCard({
           <Button
             variant="outline"
             className="w-full"
-            onClick={onEnroll}
+            onClick={() => onEnroll?.()}
             data-testid="button-enroll-course"
           >
             Enroll in Course
           </Button>
-        ) : (
+        ) : isManager ? (
           <>
             {children || (
               <Button
-                variant="outline"
-                className="w-full"
-                onClick={onManageEnrollment}
-                data-testid="button-manage-enrollment"
-              >
-                {userRole === "tutor" ? "Manage Enrollments" : "Manage Enrollments"}
-              </Button>
+                  variant="outline"
+                  className="w-full"
+                  onClick={onManageEnrollment ? () => onManageEnrollment() : undefined}
+                  data-testid="button-manage-enrollment"
+                >
+                  Manage Enrollments
+                </Button>
             )}
           </>
+        ) : (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => onEnroll?.()}
+            data-testid="button-enroll-course"
+          >
+            Enroll in Course
+          </Button>
         )}
       </CardFooter>
     </Card>

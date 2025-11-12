@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Open Admin Endpoint</title>
+    <style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:20px}pre{background:#f6f8fa;padding:12px;border-radius:6px;overflow:auto}</style>
+  </head>
+  <body>
+    <h1>Admin /api/users Viewer</h1>
+    <p>This page will call the admin-only endpoint <code>/api/users</code> on <strong>http://localhost:5000</strong> using an admin token embedded for convenience.</p>
+    <p>WARNING: This file embeds a live token — keep it local and remove it when done.</p>
+    <button id="run">Fetch /api/users</button>
+    <h2>Response</h2>
+    <pre id="out">(not fetched yet)</pre>
+
+    <script>
+      // Paste the token value below if you regenerate it.
+      const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTEzOTRjODY3OTMwODU1ZThkOTBlYTkiLCJyb2xlIjoiYWRtaW4iLCJlbWFpbCI6ImFkbWluLWNpQGV4YW1wbGUuY29tIiwiZnVsbE5hbWUiOiJDSSBBZG1pbiIsImlhdCI6MTc2Mjg5MTQ5NywiZXhwIjoxNzYyOTc3ODk3fQ.nt8kB2xKARy-dOXmoCzLvjhlqeJkkvpdP5FTBosSTAw";
+
+      document.getElementById('run').addEventListener('click', async () => {
+        const out = document.getElementById('out');
+        out.textContent = 'Fetching...';
+        try {
+          const res = await fetch('http://localhost:5000/api/users', {
+            headers: { Authorization: 'Bearer ' + TOKEN }
+          });
+          const json = await res.json().catch(() => ({ error: 'invalid json' }));
+          out.textContent = JSON.stringify({ status: res.status, body: json }, null, 2);
+        } catch (e) {
+          out.textContent = String(e);
+        }
+      });
+    </script>
+  </body>
+</html>

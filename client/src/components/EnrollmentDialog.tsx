@@ -9,14 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// bulk-select removed — single-email enrollment only
 import { toast } from "@/hooks/use-toast";
+import { coursesApi } from "@/lib/api";
 import { UserPlus } from "lucide-react";
 
 interface EnrollmentDialogProps {
@@ -35,45 +30,36 @@ export function EnrollmentDialog({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [studentEmail, setStudentEmail] = useState("");
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  // removed bulk selection; only single studentEmail is supported now
 
   const handleEnrollStudent = async () => {
+    // quick client-side auth guard so we don't send unauthenticated requests
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      toast({
+        title: 'Not authenticated',
+        description: 'Please log in as a tutor or admin before enrolling students.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (studentEmail.trim()) {
       setIsLoading(true);
       try {
-        // API call to enroll a student by email
-        const response = await fetch("/api/enrollments", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            courseId,
-            studentEmail,
-            enrolledBy: userRole,
-          }),
-        });
+        // Use coursesApi.enroll which attaches auth header and calls POST /courses/:id/enroll
+        const resp: any = await coursesApi.enroll(courseId, [studentEmail]);
 
-        if (response.ok) {
-          toast({
-            title: "Student Enrolled Successfully",
-            description: `Student with email ${studentEmail} has been enrolled in ${courseTitle}.`,
-          });
-          setStudentEmail("");
-          onEnrollmentComplete?.();
-        } else {
-          const error = await response.json();
-          toast({
-            title: "Error Enrolling Student",
-            description: error.error || "Failed to enroll student. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
+        toast({
+          title: "Student Enrolled Successfully",
+          description: `Student with email ${studentEmail} has been enrolled in ${courseTitle}.`,
+        });
+        setStudentEmail("");
+        onEnrollmentComplete?.();
+      } catch (error: any) {
         console.error("Error enrolling student:", error);
         toast({
           title: "Error Enrolling Student",
-          description: "Network error. Please check your connection and try again.",
+          description: (error && error.message) || "Failed to enroll student. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -82,51 +68,7 @@ export function EnrollmentDialog({
     }
   };
 
-  const handleBulkEnroll = async () => {
-    if (selectedStudents.length > 0) {
-      setIsLoading(true);
-      try {
-        // API call to enroll multiple students
-        const response = await fetch("/api/enrollments/bulk", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            courseId,
-            studentIds: selectedStudents,
-            enrolledBy: userRole,
-          }),
-        });
-
-        if (response.ok) {
-          toast({
-            title: "Students Enrolled Successfully",
-            description: `${selectedStudents.length} students have been enrolled in ${courseTitle}.`,
-          });
-          setSelectedStudents([]);
-          onEnrollmentComplete?.();
-          setIsOpen(false);
-        } else {
-          const error = await response.json();
-          toast({
-            title: "Error Enrolling Students",
-            description: error.error || "Failed to enroll students. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Error enrolling students:", error);
-        toast({
-          title: "Error Enrolling Students",
-          description: "Network error. Please check your connection and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  };
+  // bulk enrollment removed — see single email enrollment
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -170,57 +112,7 @@ export function EnrollmentDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Bulk Enrollment</Label>
-              <Select 
-                onValueChange={(value) => {
-                  if (!selectedStudents.includes(value)) {
-                    setSelectedStudents([...selectedStudents, value]);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select students" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student1@example.com">John Doe (student1@example.com)</SelectItem>
-                  <SelectItem value="student2@example.com">Jane Smith (student2@example.com)</SelectItem>
-                  <SelectItem value="student3@example.com">David Mwangi (student3@example.com)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {selectedStudents.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <Label>Selected Students ({selectedStudents.length})</Label>
-                  <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
-                    <ul className="space-y-1">
-                      {selectedStudents.map((student, index) => (
-                        <li key={index} className="flex justify-between items-center text-sm">
-                          <span>{student}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedStudents(selectedStudents.filter(s => s !== student));
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-
-              <Button 
-                className="w-full mt-2" 
-                onClick={handleBulkEnroll}
-                disabled={isLoading || selectedStudents.length === 0}
-              >
-                Enroll Selected Students
-              </Button>
-            </div>
+            {/* Bulk enrollment removed — single email enrollment only */}
           </div>
 
           <div className="flex justify-end gap-2">

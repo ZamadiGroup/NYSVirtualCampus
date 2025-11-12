@@ -8,8 +8,61 @@ import { AssignmentCard } from "@/components/AssignmentCard";
 import { AnnouncementCard } from "@/components/AnnouncementCard";
 import { BookOpen, Users, Clock, Award } from "lucide-react";
 import techThumbnail from "@assets/generated_images/Technology_course_thumbnail_5e4c2c8c.png";
+import { useEffect, useState } from "react";
+import { coursesApi, ApiCourse } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus } from "lucide-react";
+
+function parseJwt(token?: string | null) {
+  if (!token) return null;
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return decoded;
+  } catch (e) {
+    return null;
+  }
+}
 
 export default function CourseDetail() {
+  const [course, setCourse] = useState<ApiCourse | null>(null);
+  const [newChapterTitle, setNewChapterTitle] = useState("");
+  const [newChapterDesc, setNewChapterDesc] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const currentUser = parseJwt(token);
+  const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'tutor');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await coursesApi.getAll();
+        if (Array.isArray(all) && all.length > 0) {
+          setCourse(all[0] as ApiCourse);
+        }
+      } catch (e) {
+        console.error('Failed to load course for details', e);
+      }
+    })();
+  }, []);
+
+  const addChapter = async () => {
+    if (!course) return;
+    const chapters = [...(course.chapters || []), { title: newChapterTitle, description: newChapterDesc, materials: [] }];
+    try {
+      const updated = await coursesApi.update(course.id, { chapters });
+      setCourse(updated as ApiCourse);
+      setNewChapterTitle("");
+      setNewChapterDesc("");
+    } catch (e) {
+      console.error('Failed to add chapter', e);
+    }
+  };
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -100,11 +153,56 @@ export default function CourseDetail() {
           <Progress value={65} className="h-3" />
         </CardContent>
       </Card>
+      {course && (
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Course Notes</CardTitle>
+            {canEdit && !editMode && (
+              <div>
+                <Button size="sm" variant="outline" onClick={() => { setEditNotes(course.notes || ''); setEditMode(true); }}>
+                  Edit
+                </Button>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            {!editMode ? (
+              <div className="prose max-w-none">
+                <p>{course.notes || <span className="text-muted-foreground">No notes for this course.</span>}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={6} />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => { setEditMode(false); setEditNotes(''); }} disabled={savingNotes}>Cancel</Button>
+                  <Button onClick={async () => {
+                    try {
+                      setSavingNotes(true);
+                      const updated = await coursesApi.update(course.id, { notes: editNotes });
+                      setCourse(updated as ApiCourse);
+                      toast({ title: 'Notes saved', description: 'Course notes updated successfully.' });
+                      setEditMode(false);
+                    } catch (err: any) {
+                      console.error('Failed to save notes', err);
+                      toast({ title: 'Save failed', description: (err && err.message) || 'Unable to save notes', variant: 'destructive' });
+                    } finally {
+                      setSavingNotes(false);
+                    }
+                  }} disabled={savingNotes}>Save</Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="materials" className="w-full">
         <TabsList>
           <TabsTrigger value="materials" data-testid="tab-materials">
             Materials
+          </TabsTrigger>
+          <TabsTrigger value="chapters" data-testid="tab-chapters">
+            Chapters
           </TabsTrigger>
           <TabsTrigger value="assignments" data-testid="tab-assignments">
             Assignments
@@ -140,6 +238,52 @@ export default function CourseDetail() {
             uploadedAt={today}
             onView={() => console.log("Open link")}
           />
+        </TabsContent>
+
+        <TabsContent value="chapters" className="space-y-4">
+          <div className="max-w-3xl space-y-4">
+              {course && course.chapters && course.chapters.length > 0 ? (
+                course.chapters.map((c, idx) => (
+                  <div key={idx} className="p-4 border rounded-md">
+                    <h3 className="font-semibold">Chapter {idx + 1}: {c.title}</h3>
+                    <p className="text-sm text-muted-foreground">{c.description}</p>
+                    {c.materials && c.materials.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                          {c.materials.map((m, mIdx) => {
+                            const titleStr = (m.label || m.url || `Material ${mIdx + 1}`) as string;
+                            return (
+                              <MaterialCard
+                                key={`${idx}-${mIdx}`}
+                                id={`${idx}-${mIdx}`}
+                                title={titleStr}
+                                type={(m.type as any) || 'pdf'}
+                                uploadedAt={new Date()}
+                                onDownload={() => { if (m.url) window.open(m.url, '_blank'); }}
+                                onView={() => { if (m.url) window.open(m.url, '_blank'); }}
+                              />
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No chapters yet.</p>
+              )}
+
+            {canEdit ? (
+              <div className="pt-4 border-t">
+                <h4 className="font-semibold">Add Chapter</h4>
+                <div className="grid grid-cols-1 gap-2 mt-2">
+                  <Input placeholder="Chapter title" value={newChapterTitle} onChange={(e) => setNewChapterTitle(e.target.value)} />
+                  <Textarea placeholder="Chapter content / notes" value={newChapterDesc} onChange={(e) => setNewChapterDesc(e.target.value)} rows={4} />
+                    <div className="flex justify-end">
+                    <Button onClick={addChapter}><Plus className="mr-2 h-4 w-4"/>Add Chapter</Button>
+                    </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </TabsContent>
 
         <TabsContent value="assignments" className="space-y-4">

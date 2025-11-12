@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { coursesApi } from "@/lib/api";
+import { coursesApi, usersApi } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 type CreateCourseProps = {
   onCancel?: () => void;
@@ -29,6 +30,12 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
   const [tags, setTags] = useState<string>("");
   const [estimatedDuration, setEstimatedDuration] = useState<string>("");
   const [outline, setOutline] = useState<CourseOutlineItem[]>([{ title: "", description: "" }]);
+  const [enrollEmails, setEnrollEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState("");
+  const [existingCourseId, setExistingCourseId] = useState("");
+  const [facilitators, setFacilitators] = useState<any[]>([]);
+  const [selectedFacilitator, setSelectedFacilitator] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const courseJson = {
     title,
@@ -52,11 +59,15 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
 
   const handleSubmit = async () => {
     try {
+      if (!title.trim() || !department.trim()) {
+        toast({ title: 'Missing fields', description: 'Title and Department are required', variant: 'destructive' });
+        return;
+      }
       const courseData = {
         title: courseJson.title,
         description: courseJson.notes,
         department: courseJson.department,
-        instructorId: "demo-tutor-id", // In real app, get from auth context
+        // instructorId is optional; backend will default to the authenticated user
         notes: courseJson.notes,
         pptLinks: courseJson.pptLinks,
         resources: courseJson.resources,
@@ -64,9 +75,13 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
         tags: courseJson.tags,
         estimatedDuration: courseJson.estimatedDuration,
         outline: courseJson.outline,
+        instructorId: selectedFacilitator || undefined,
+        enrollEmails,
       };
       
-      const newCourse = await coursesApi.create(courseData);
+      const res = await coursesApi.create(courseData);
+      // API may return { course, enrollments } or the course directly
+      const newCourse = (res && (res as any).course) ? (res as any).course : res;
       toast({ title: "Course created", description: "Your course has been created successfully." });
       onCreated?.(newCourse);
     } catch (error) {
@@ -76,6 +91,61 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
         variant: "destructive"
       });
     }
+  };
+
+  useEffect(() => {
+    // If admin, fetch tutors for facilitator dropdown
+    (async () => {
+      try {
+        if (user?.role === 'admin') {
+          const list = await usersApi.getByRole('tutor');
+          if (Array.isArray(list)) setFacilitators(list as any[]);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, [user]);
+
+  // Allow adding more enrollments after course creation
+  const handleEnrollExisting = async (courseId: string) => {
+    try {
+      if (!enrollEmails.length) {
+        toast({ title: 'No emails', description: 'Add at least one email to enroll', variant: 'destructive' });
+        return;
+      }
+      const resp = await coursesApi.enroll(courseId, enrollEmails);
+      toast({ title: 'Enrollments processed', description: 'Enrollment operation completed.' });
+      // clear enrollEmails after processing
+      setEnrollEmails([]);
+    } catch (e) {
+      toast({ title: 'Enrollment failed', description: e instanceof Error ? e.message : 'Failed to enroll', variant: 'destructive' });
+    }
+  };
+
+  const addEmail = () => {
+    const em = emailInput.trim();
+    if (!em) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+      toast({ title: 'Invalid email', description: 'Please enter a valid email address', variant: 'destructive' });
+      return;
+    }
+    if (enrollEmails.includes(em)) {
+      setEmailInput('');
+      return;
+    }
+    setEnrollEmails((s) => [...s, em]);
+    setEmailInput('');
+  };
+
+  const removeEmail = (idx: number) => setEnrollEmails((s) => s.filter((_, i) => i !== idx));
+
+  const enrollToExisting = async () => {
+    if (!existingCourseId.trim()) {
+      toast({ title: 'Missing course id', description: 'Enter the Course ID to enroll to', variant: 'destructive' });
+      return;
+    }
+    await handleEnrollExisting(existingCourseId.trim());
   };
 
   return (
@@ -95,6 +165,20 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
               <Input id="department" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Technology" />
             </div>
           </div>
+
+          {facilitators.length > 0 && (
+            <div>
+              <Label>Assign Facilitator</Label>
+              <div className="flex gap-2 items-center">
+                <select value={selectedFacilitator || ''} onChange={(e) => setSelectedFacilitator(e.target.value || null)} className="border rounded px-2 py-1">
+                  <option value="">-- Choose facilitator --</option>
+                  {facilitators.map((f) => (
+                    <option key={f._id || f.id} value={f._id || f.id}>{f.fullName} ({f.email})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="notes">Course Notes</Label>
@@ -195,6 +279,30 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
             ))}
           </div>
 
+          <div className="space-y-2">
+            <Label>Enroll students by email</Label>
+            <div className="flex gap-2">
+              <Input value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="student@example.com" />
+              <Button onClick={addEmail}>Add</Button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {enrollEmails.map((em, i) => (
+                <div key={i} className="px-3 py-1 bg-muted rounded-full flex items-center gap-2">
+                  <span className="text-sm">{em}</span>
+                  <button type="button" onClick={() => removeEmail(i)} className="text-red-600 text-xs">x</button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 border-t pt-3">
+              <Label>Add emails to an existing course</Label>
+              <div className="flex gap-2 mt-2">
+                <Input placeholder="Existing Course ID" value={existingCourseId} onChange={(e) => setExistingCourseId(e.target.value)} />
+                <Button onClick={enrollToExisting} variant="outline">Enroll</Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Use this to add the emails you added above to an already created course.</p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between pt-4">
             <div className="flex flex-wrap gap-2">
               {(courseJson.tags as string[]).map((t, i) => (
@@ -204,6 +312,7 @@ export default function CreateCourse({ onCancel, onCreated }: CreateCourseProps)
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
               <Button type="button" onClick={handleSubmit} data-testid="button-submit-course">Create Course</Button>
+              {/* If course already exists (in editing mode) we could call handleEnrollExisting(courseId) */}
             </div>
           </div>
         </CardContent>

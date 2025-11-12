@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { coursesApi } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
 import { CourseCard } from "@/components/CourseCard";
 import { AssignmentCard } from "@/components/AssignmentCard";
@@ -20,35 +21,7 @@ export default function StudentDashboard() {
   yesterday.setDate(yesterday.getDate() - 1);
 
   // State for enrolled and available courses
-  const [enrolledCourses, setEnrolledCourses] = useState([
-    {
-      id: "1",
-      title: "Introduction to Computer Science",
-      instructor: "Dr. Sarah Kamau",
-      thumbnail: techThumbnail,
-      department: "Technology",
-      enrolledCount: 145,
-      progress: 65,
-    },
-    {
-      id: "2",
-      title: "Business Management Fundamentals",
-      instructor: "Prof. John Mwangi",
-      thumbnail: businessThumbnail,
-      department: "Business",
-      enrolledCount: 98,
-      progress: 45,
-    },
-    {
-      id: "3",
-      title: "Civil Engineering Basics",
-      instructor: "Eng. Mary Wanjiru",
-      thumbnail: engineeringThumbnail,
-      department: "Engineering",
-      enrolledCount: 76,
-      progress: 30,
-    }
-  ]);
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
 
   const [availableCourses, setAvailableCourses] = useState([
     {
@@ -70,6 +43,57 @@ export default function StudentDashboard() {
       progress: 0,
     }
   ]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchAvailable = async () => {
+      try {
+        const res = await coursesApi.getAvailable();
+        if (!mounted) return;
+        if (Array.isArray(res)) {
+          setAvailableCourses(res.map((c: any) => ({
+            id: c._id || c.id,
+            title: c.title,
+            instructor: c.instructorId?.fullName || 'TBD',
+            thumbnail: c.thumbnail || techThumbnail,
+            department: c.department,
+            enrolledCount: (c.enrolledCount || 0),
+            progress: 0,
+          })));
+        }
+      } catch (e) {
+        console.warn('Failed to load available courses', e);
+      }
+    };
+    fetchAvailable();
+    return () => { mounted = false };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchEnrolled = async () => {
+      try {
+        const res = await coursesApi.getMyEnrollments();
+        if (!mounted) return;
+        if (Array.isArray(res)) {
+          setEnrolledCourses(res.map((c: any) => ({
+            id: c._id || c.id,
+            title: c.title,
+            instructor: c.instructorId?.fullName || 'TBD',
+            thumbnail: c.thumbnail || techThumbnail,
+            department: c.department,
+            enrolledCount: (c.enrolledCount || 0),
+            progress: 0,
+          })));
+        }
+      } catch (e) {
+        console.warn('Failed to fetch enrolled courses', e);
+      }
+    };
+    fetchEnrolled();
+    return () => { mounted = false };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Function to handle enrollment
   const handleEnroll = (courseId: string) => {

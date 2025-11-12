@@ -13,6 +13,7 @@ import {
   type JWTPayload 
 } from "./jwt";
 import { nanoid } from "nanoid";
+import fs from 'fs';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const router = Router();
@@ -108,11 +109,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/auth/register", async (req, res) => {
     try {
-      const { email, password, fullName, role = "student" } = req.body;
-      
+      const { email, password, fullName } = req.body;
+
       if (!email || !password || !fullName) {
         return res.status(400).json({ error: "Email, password, and full name are required" });
       }
+
+      // For public registration we do NOT allow creating admin accounts.
+      // However, we allow registering as 'student' or 'tutor' from the public form.
+      // Admin accounts must still be created via the protected /users endpoint.
+      const requestedRole = req.body.role;
+      const role = requestedRole === 'tutor' ? 'tutor' : 'student';
 
       // Check if user already exists
       const existingUser = await User.findOne({ email });
@@ -123,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ensure username exists for schema requirements. Derive from email if not provided.
       const username = req.body.username || (email.includes('@') ? email.split('@')[0] : email);
 
-      // Create new user
+      // Create new user with enforced role
       const newUser = new User({
         username,
         email,
@@ -161,7 +168,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
-      const allUsers = await User.find().select('-password');
+      const roleFilter = (req.query.role as string) || undefined;
+      const query: any = {};
+      if (roleFilter) query.role = roleFilter;
+      const allUsers = await User.find(query).select('-password');
       res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -185,6 +195,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/courses", authenticate, async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
+      // Students should only see courses they're enrolled in
+      if (authReq.user.role === 'student') {
+        const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
+        const courseIds = enrollments.map((e) => e.courseId);
+        const courses = await Course.find({ _id: { $in: courseIds }, isActive: true }).populate('instructorId', 'fullName');
+        return res.json(courses);
+      }
+
+      // Tutors and admins see all active courses
       const allCourses = await Course.find({ isActive: true }).populate('instructorId', 'fullName');
       res.json(allCourses);
     } catch (error) {
@@ -193,22 +212,264 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Courses assigned to the authenticated facilitator (tutor)
+  router.get('/courses/my', authenticate, requireRole(['tutor','admin']), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const courses = await Course.find({ instructorId: authReq.user.userId, isActive: true }).populate('instructorId', 'fullName');
+      res.json(courses);
+    } catch (err) {
+      console.error('Error fetching my courses', err);
+      res.status(500).json({ error: 'Failed to fetch my courses' });
+    }
+  });
+
+  // Courses available to a student (not enrolled yet)
+  router.get('/courses/available', authenticate, async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      if (authReq.user.role === 'student') {
+        const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
+        const courseIds = enrollments.map((e) => e.courseId);
+        const available = await Course.find({ _id: { $nin: courseIds }, isActive: true }).populate('instructorId', 'fullName');
+        return res.json(available);
+      }
+      // tutors/admins see all active courses as available
+      const all = await Course.find({ isActive: true }).populate('instructorId', 'fullName');
+      res.json(all);
+    } catch (err) {
+      console.error('Error fetching available courses', err);
+      res.status(500).json({ error: 'Failed to fetch available courses' });
+    }
+  });
+
   router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
       // Generate a unique enrollment key
       const enrollmentKey = nanoid(8).toUpperCase();
-      
-      const newCourse = new Course({
+
+      const authReq = req as AuthenticatedRequest;
+      // Default instructorId to the authenticated user if not provided
+      const instructorId = req.body.instructorId || authReq.user.userId;
+
+      // Persist enrollEmails if provided
+      const coursePayload: any = {
         ...req.body,
-        enrollmentKey
-      });
+        instructorId,
+        enrollmentKey,
+      };
+
+      if (Array.isArray(req.body.enrollEmails)) {
+        coursePayload.enrollEmails = req.body.enrollEmails.filter((e: any) => typeof e === 'string' && e.includes('@'));
+      }
+
+      const newCourse = new Course(coursePayload);
       await newCourse.save();
       await newCourse.populate('instructorId', 'fullName');
-      res.json(newCourse);
+
+      // If enrollEmails provided, try to create enrollments for existing student users
+      const enrollResults: { processed: string[]; skipped: string[]; notFound: string[] } = { processed: [], skipped: [], notFound: [] };
+      if (Array.isArray(coursePayload.enrollEmails) && coursePayload.enrollEmails.length) {
+        for (const em of coursePayload.enrollEmails) {
+          try {
+            const user = await User.findOne({ email: em });
+            if (!user) {
+                // Create an invited placeholder student account so we can track the invite
+                try {
+                  const inviteToken = nanoid(12);
+                  const baseName = (em.split('@')[0] || 'invited').replace(/[^a-zA-Z0-9._-]/g, '_');
+                  let username = `${baseName}_inv`;
+                  // Ensure username uniqueness
+                  let suffix = 0;
+                  while (await User.findOne({ username })) {
+                    suffix += 1;
+                    username = `${baseName}_inv${suffix}`;
+                  }
+
+                  const placeholder = new User({
+                    username,
+                    password: nanoid(10), // random password until claimed
+                    email: em,
+                    fullName: 'Invited Student',
+                    role: 'student',
+                    isInvited: true,
+                    inviteToken,
+                  });
+                  await placeholder.save();
+
+                  // auto-enroll the invited student
+                  const enrollment = new Enrollment({ courseId: newCourse._id, studentId: placeholder._id });
+                  await enrollment.save();
+                  enrollResults.processed.push(em);
+                } catch (ie) {
+                  console.error('Failed to create invited placeholder for', em, ie);
+                  enrollResults.notFound.push(em);
+                }
+                continue;
+            }
+
+            // Only students can be auto-enrolled here
+            if (user.role !== 'student') {
+              enrollResults.skipped.push(em);
+              continue;
+            }
+
+            // Avoid duplicate enrollments
+            const existing = await Enrollment.findOne({ courseId: newCourse._id, studentId: user._id });
+            if (existing) {
+              enrollResults.skipped.push(em);
+              continue;
+            }
+
+            const enrollment = new Enrollment({ courseId: newCourse._id, studentId: user._id });
+            await enrollment.save();
+            enrollResults.processed.push(em);
+          } catch (e) {
+            console.error('Error processing enrollEmail', em, e);
+            enrollResults.skipped.push(em);
+          }
+        }
+      }
+
+      res.json({ course: newCourse, enrollments: enrollResults });
     } catch (error) {
       console.error("Error creating course:", error);
       res.status(500).json({ error: "Failed to create course" });
+    }
+  });
+
+  // File upload via base64 (simple demo endpoint) — accepts { filename, contentBase64 }
+  router.post('/uploads', authenticate, requireRole(['tutor','admin']), async (req, res) => {
+    try {
+      const { filename, contentBase64 } = req.body;
+      if (!filename || !contentBase64) return res.status(400).json({ error: 'filename and contentBase64 required' });
+
+      // sanitize filename
+      const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uploadsDir = new URL('../attached_assets/uploads', import.meta.url).pathname;
+      const filePath = `${uploadsDir}/${Date.now()}_${safeName}`;
+      const buffer = Buffer.from(contentBase64, 'base64');
+      await fs.promises.writeFile(filePath, buffer);
+
+      // return a URL relative to server's /uploads static route
+      const urlPath = `/uploads/${filePath.split('/').slice(-1)[0]}`;
+      res.json({ url: urlPath });
+    } catch (err) {
+      console.error('upload error', err);
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  });
+
+  // Update a course (tutor or admin)
+  router.put("/courses/:id", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const course = await Course.findById(req.params.id);
+      if (!course) return res.status(404).json({ error: "Course not found" });
+
+      // If tutor, ensure they are the instructor
+      if (authReq.user.role !== 'admin' && course.instructorId.toString() !== authReq.user.userId) {
+        return res.status(403).json({ error: "Only the course instructor or admin can update the course" });
+      }
+
+      // Allow updating of specific fields
+      const updatable = [
+        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive'
+      ];
+
+      updatable.forEach((key) => {
+        if (req.body[key] !== undefined) {
+          (course as any)[key] = req.body[key];
+        }
+      });
+
+      await course.save();
+      await course.populate('instructorId', 'fullName');
+      res.json(course);
+    } catch (error) {
+      console.error("Error updating course:", error);
+      res.status(500).json({ error: "Failed to update course" });
+    }
+  });
+
+  // Enroll students into an existing course by email (tutor or admin)
+  router.post('/courses/:id/enroll', authenticate, requireRole(['tutor','admin']), async (req, res) => {
+    try {
+      const course = await Course.findById(req.params.id);
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+
+      // Only instructor or admin may add enrollments
+      const authReq = req as AuthenticatedRequest;
+      if (authReq.user.role !== 'admin' && course.instructorId.toString() !== authReq.user.userId) {
+        return res.status(403).json({ error: 'Only the instructor or admin may enroll students' });
+      }
+
+      const { enrollEmails } = req.body;
+      if (!Array.isArray(enrollEmails) || enrollEmails.length === 0) return res.status(400).json({ error: 'enrollEmails array required' });
+
+      const enrollResults: { processed: string[]; skipped: string[]; notFound: string[] } = { processed: [], skipped: [], notFound: [] };
+
+      // ensure course document stores these emails
+      course.enrollEmails = Array.from(new Set([...(course.enrollEmails || []), ...enrollEmails.filter((e: any) => typeof e === 'string')]));
+      await course.save();
+
+      for (const em of enrollEmails) {
+        try {
+          const user = await User.findOne({ email: em });
+          if (!user) {
+            // create invited placeholder student account
+            try {
+              const inviteToken = nanoid(12);
+              const baseName = (em.split('@')[0] || 'invited').replace(/[^a-zA-Z0-9._-]/g, '_');
+              let username = `${baseName}_inv`;
+              let suffix = 0;
+              while (await User.findOne({ username })) {
+                suffix += 1;
+                username = `${baseName}_inv${suffix}`;
+              }
+              const placeholder = new User({
+                username,
+                password: nanoid(10),
+                email: em,
+                fullName: 'Invited Student',
+                role: 'student',
+                isInvited: true,
+                inviteToken,
+              });
+              await placeholder.save();
+
+              const enrollment = new Enrollment({ courseId: course._id, studentId: placeholder._id });
+              await enrollment.save();
+              enrollResults.processed.push(em);
+            } catch (ie) {
+              console.error('Failed to create invited placeholder for', em, ie);
+              enrollResults.notFound.push(em);
+            }
+            continue;
+          }
+          if (user.role !== 'student') {
+            enrollResults.skipped.push(em);
+            continue;
+          }
+          const existing = await Enrollment.findOne({ courseId: course._id, studentId: user._id });
+          if (existing) {
+            enrollResults.skipped.push(em);
+            continue;
+          }
+          const enrollment = new Enrollment({ courseId: course._id, studentId: user._id });
+          await enrollment.save();
+          enrollResults.processed.push(em);
+        } catch (e) {
+          console.error('Error processing enrollEmail', em, e);
+          enrollResults.skipped.push(em);
+        }
+      }
+
+      res.json({ course, enrollments: enrollResults });
+    } catch (err) {
+      console.error('Error enrolling students', err);
+      res.status(500).json({ error: 'Failed to enroll students' });
     }
   });
 
@@ -219,15 +480,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!course) {
         return res.status(404).json({ error: "Course not found" });
       }
-      
-      // Only show enrollment key to tutors and admins
+
+      // Students can only access the course if enrolled
+      if (authReq.user.role === 'student') {
+        const existing = await Enrollment.findOne({ courseId: course._id, studentId: authReq.user.userId });
+        if (!existing) {
+          return res.status(403).json({ error: 'You are not enrolled in this course' });
+        }
+      }
+
       const response = course.toObject() as any;
+      // Only show enrollment key to tutors and admins
       if (authReq.user.role !== 'student') {
         response.enrollmentKey = course.enrollmentKey;
       } else {
         delete response.enrollmentKey;
       }
-      
+
+      // For students, only include chapter metadata and material URLs (no admin-only fields)
+      // (chapters are part of the course document already)
       res.json(response);
     } catch (error) {
       console.error("Error fetching course:", error);
@@ -310,6 +581,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating assignment:", error);
       res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Admin: graduate a student (set isGraduated flag)
+  router.post('/users/:id/graduate', authenticate, requireRole(['admin']), async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (user.role !== 'student') return res.status(400).json({ error: 'Only students can be graduated' });
+      user.isGraduated = true;
+      await user.save();
+      res.json({ success: true, user });
+    } catch (err) {
+      console.error('Error graduating student', err);
+      res.status(500).json({ error: 'Failed to graduate student' });
     }
   });
 

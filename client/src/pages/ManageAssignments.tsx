@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { assignmentsApi } from "@/lib/api";
 
 type AssignmentLite = {
   id: string;
@@ -16,6 +18,7 @@ type Props = {
 };
 
 export default function ManageAssignments({ assignments, onExtendDueDate }: Props) {
+  const { toast } = useToast();
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold">Manage Assignments</h2>
@@ -35,10 +38,17 @@ export default function ManageAssignments({ assignments, onExtendDueDate }: Prop
                 <Input type="datetime-local" onChange={(e) => (e.currentTarget.dataset.date = e.target.value)} data-date="" />
                 <Button
                   size="sm"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     const container = (e.currentTarget.previousSibling as HTMLInputElement);
                     const newDate = (container as any)?.dataset?.date || (container as HTMLInputElement).value;
-                    if (newDate) onExtendDueDate(a.id, newDate);
+                    if (!newDate) return toast({ title: 'No date', description: 'Please pick a new date', variant: 'destructive' });
+                    try {
+                      await assignmentsApi.updateDueDate(a.id, newDate);
+                      toast({ title: 'Deadline updated', description: 'Assignment deadline was updated.' });
+                      onExtendDueDate(a.id, newDate);
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err?.message || 'Failed to update deadline', variant: 'destructive' });
+                    }
                   }}
                 >
                   Extend

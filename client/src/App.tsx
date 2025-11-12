@@ -1,18 +1,19 @@
-import { useState } from "react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import React, { useState, useEffect } from "react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import Header from "@/components/Header";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { PlanNotificationProvider } from "@/components/PlanNotification";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import nysLogo from "@assets/generated_images/NYS_Kenya_official_logo_4530e265.png";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Homepage from "@/pages/Homepage";
+import Auth from "@/pages/Auth";
 import StudentDashboard from "@/pages/StudentDashboard";
 import TutorDashboard from "@/pages/TutorDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
@@ -26,12 +27,16 @@ import AdminUploads from "@/pages/AdminUploads";
 import ManageAssignments from "@/pages/ManageAssignments";
 import TutorGrades from "@/pages/TutorGrades";
 import Announcements, { type Announcement } from "@/pages/Announcements";
+import { useAuth } from "@/lib/useAuth";
+import { getCurrentUser } from '@/lib/auth';
+import LoginDialog from "@/components/LoginDialog";
 
 
 function App() {
-  const [currentView, setCurrentView] = useState<"student" | "tutor" | "admin">("student");
+  // removed demo role-switcher: derive view from authenticated user or default to 'student'
   const [currentPage, setCurrentPage] = useState<
     | "homepage"
+    | "auth"
     | "dashboard" 
     | "courses"
     | "course-detail"
@@ -74,91 +79,84 @@ function App() {
     setCurrentPage(page as any);
   };
 
+  const { user, isAuthenticated, logout, refresh } = useAuth();
+  // Normalize role: server may return 'lecturer' or 'tutor' for teaching staff.
+  const normalizeRole = (r: string | undefined | null) => {
+    if (!r) return 'student';
+    if (r === 'admin') return 'admin';
+    if (r === 'tutor' || r === 'lecturer') return 'tutor';
+    return 'student';
+  };
+
+  const view = normalizeRole(user?.role as string | undefined);
+
+  // Sync hash-based navigation for simple full-page auth routing (e.g. #auth)
+  useEffect(() => {
+    const applyHash = () => {
+      try {
+        const h = window.location.hash.replace(/^#/, '');
+        if (h === 'auth') setCurrentPage('auth');
+      } catch (e) {
+        // ignore
+      }
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <PlanNotificationProvider>
           <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
-              <AppSidebar userRole={currentView} userName={userNames[currentView]} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
+              {/* Hide sidebar on the auth page for a full-page auth experience */}
+              {currentPage !== 'auth' && (
+                <AppSidebar userRole={view} userName={userNames[view]} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
+              )}
               <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between gap-4 p-4 border-b-2 border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
-                <div className="flex items-center gap-3">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-green-800" />
-                  <img src={nysLogo} alt="NYS Kenya" className="h-12 w-12 hidden md:block flex-shrink-0" />
-                  <div className="hidden md:block">
-                    <h2 className="font-bold text-lg text-white">NYS Virtual Campus</h2>
-                    <p className="text-sm text-green-100">National Youth Service Kenya</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Card className="px-4 py-2 bg-white/10 border border-white/20">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white">Role:</span>
-                      <Badge variant="outline" className="text-sm px-3 py-1 border border-white bg-white/20 text-white font-bold">{currentView}</Badge>
-                    </div>
-                  </Card>
-                  <ThemeToggle />
-                </div>
-              </header>
+                {/* Hide navigation (sidebar/header) for the full-page auth view */}
+                {currentPage !== 'auth' && <Header />}
 
               <div className="flex-1 overflow-auto bg-background">
                 <div className="container mx-auto p-6 max-w-7xl">
-                  {/* Role switcher with NYS Kenya theme */}
-                  <Card className="mb-6 border-2 border-green-200 shadow-lg">
-                    <CardHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-t-lg">
-                      <CardTitle className="text-lg font-bold">Switch User Role</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <Tabs value={currentView} onValueChange={(v) => setCurrentView(v as any)}>
-                        <TabsList className="grid w-full grid-cols-3 bg-green-100">
-                          <TabsTrigger 
-                            value="student" 
-                            data-testid="tab-role-student"
-                            className="data-[state=active]:bg-green-600 data-[state=active]:text-white font-semibold"
-                          >
-                            Student
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="tutor" 
-                            data-testid="tab-role-tutor"
-                            className="data-[state=active]:bg-green-600 data-[state=active]:text-white font-semibold"
-                          >
-                            Tutor
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="admin" 
-                            data-testid="tab-role-admin"
-                            className="data-[state=active]:bg-green-600 data-[state=active]:text-white font-semibold"
-                          >
-                            Admin
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </CardContent>
-                  </Card>
-
                   {currentPage === "homepage" && (
                     <Homepage 
-                      userRole={currentView} 
-                      userName={userNames[currentView]} 
+                      userRole={view} 
+                      userName={userNames[view]} 
                       onNavigate={handleSidebarNavigation} 
                     />
                   )}
 
+                  {/* Full-page auth: remove header/sidebar and navigate to correct portal on login */}
+                  {currentPage === 'auth' && (
+                    <Auth onLogin={() => {
+                      // Refresh hook state and immediately read current user to decide routing
+                      try { refresh(); } catch (e) {}
+                      const newUser = getCurrentUser();
+                      const mapped = normalizeRole(newUser?.role);
+                      // Ensure dashboard shows the right portal
+                      setCurrentPage('dashboard');
+                      // reset hash if present
+                      try { window.location.hash = ''; } catch (e) {}
+                      // Optionally you could set other state here based on role
+                    }} />
+                  )}
+
                   {currentPage === "dashboard" && (
                     <>
-                      {currentView === "student" && <StudentDashboard />}
-                      {currentView === "tutor" && (
+                      {view === "student" && <StudentDashboard />}
+                      {view === "tutor" && (
                         <TutorDashboard onNavigate={handleSidebarNavigation} />
                       )}
-                      {currentView === "admin" && <AdminDashboard />}
+                      {view === "admin" && <AdminDashboard />}
                     </>
                   )}
 
-                  {currentPage === "courses" && <CourseList userRole={currentView} />}
+                  {currentPage === "courses" && <CourseList userRole={view} />}
                   {currentPage === "course-detail" && <CourseDetail />}
-                  {currentView === "tutor" && currentPage === "create-course" && (
+                  {(view === "tutor" || view === "admin") && currentPage === "create-course" && (
                     <CreateCourse
                       onCancel={() => setCurrentPage("dashboard")}
                       onCreated={() => {
@@ -177,7 +175,7 @@ function App() {
                       }}
                     />
                   )}
-                  {currentView === "tutor" && currentPage === "create-assignment" && (
+                  {view === "tutor" && currentPage === "create-assignment" && (
                     <CreateAssignment
                       onCancel={() => setCurrentPage("dashboard")}
                       onCreated={(draft: AssignmentDraft) => {
@@ -206,7 +204,7 @@ function App() {
                       }}
                     />
                   )}
-                  {currentView === "tutor" && currentPage === "manage-assignments" && (
+                  {view === "tutor" && currentPage === "manage-assignments" && (
                     <ManageAssignments
                       assignments={assignments.map((a) => ({ id: a.id, courseId: a.courseId, title: a.title, dueDate: a.dueDate }))}
                       onExtendDueDate={(id, newDue) => {
@@ -226,7 +224,7 @@ function App() {
                       }}
                     />
                   )}
-                  {currentView === "tutor" && currentPage === "tutor-grades" && (
+                  {view === "tutor" && currentPage === "tutor-grades" && (
                     <TutorGrades
                       grades={tutorGrades}
                       onUpdateManual={(assignmentId, studentName, score) => {
@@ -249,9 +247,9 @@ function App() {
                   {currentPage === "announcements" && (
                     <Announcements
                       items={announcements}
-                      canPost={currentView !== "student"}
-                      authorRole={currentView === "admin" ? "admin" : currentView === "tutor" ? "tutor" : undefined}
-                      authorName={userNames[currentView]}
+                      canPost={view !== "student"}
+                      authorRole={view === "admin" ? "admin" : view === "tutor" ? "tutor" : undefined}
+                      authorName={userNames[view]}
                       onPost={(a) => {
                         setAnnouncements((prev) => [a, ...prev]);
                         setAdminItems((prev) => [
@@ -268,7 +266,7 @@ function App() {
                       }}
                     />
                   )}
-                  {currentView === "student" && currentPage === "assignment-detail" && selectedAssignmentId && (
+                  {view === "student" && currentPage === "assignment-detail" && selectedAssignmentId && (
                     (() => {
                       const a = assignments.find((x) => x.id === selectedAssignmentId)!;
                       if (a.dueDate && new Date(a.dueDate).getTime() < Date.now()) {
@@ -369,15 +367,15 @@ function App() {
                       );
                     })()
                   )}
-                  {currentView === "student" && currentPage === "student-grades" && (
+                  {view === "student" && currentPage === "student-grades" && (
                     <StudentGrades grades={grades} />
                   )}
-                  {currentView === "admin" && currentPage === "admin-uploads" && (
+                  {view === "admin" && currentPage === "admin-uploads" && (
                     <AdminUploads items={adminItems} />
                   )}
                   
                   {/* Student specific pages */}
-                  {currentView === "student" && currentPage === "assignments" && (
+                  {view === "student" && currentPage === "assignments" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">My Assignments</h1>
                       <p className="text-muted-foreground">View and submit your assignments here.</p>
@@ -399,7 +397,7 @@ function App() {
                     </div>
                   )}
                   
-                  {currentView === "student" && currentPage === "announcements" && (
+                  {view === "student" && currentPage === "announcements" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">Announcements</h1>
                       <p className="text-muted-foreground">Stay updated with the latest announcements.</p>
@@ -407,21 +405,21 @@ function App() {
                   )}
 
                   {/* Tutor specific pages */}
-                  {currentView === "tutor" && currentPage === "assignments" && (
+                  {view === "tutor" && currentPage === "assignments" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">Assignment Management</h1>
                       <p className="text-muted-foreground">Create and manage assignments for your students.</p>
                     </div>
                   )}
                   
-                  {currentView === "tutor" && currentPage === "students" && (
+                  {view === "tutor" && currentPage === "students" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">My Students</h1>
                       <p className="text-muted-foreground">View and manage your students.</p>
                     </div>
                   )}
                   
-                  {currentView === "tutor" && currentPage === "analytics" && (
+                  {view === "tutor" && currentPage === "analytics" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">Analytics</h1>
                       <p className="text-muted-foreground">View performance analytics and insights.</p>
@@ -429,21 +427,21 @@ function App() {
                   )}
 
                   {/* Admin specific pages */}
-                  {currentView === "admin" && currentPage === "users" && (
+                  {view === "admin" && currentPage === "users" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">User Management</h1>
                       <p className="text-muted-foreground">Manage users, roles, and permissions.</p>
                     </div>
                   )}
                   
-                  {currentView === "admin" && currentPage === "analytics" && (
+                  {view === "admin" && currentPage === "analytics" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">System Analytics</h1>
                       <p className="text-muted-foreground">View system-wide analytics and reports.</p>
                     </div>
                   )}
                   
-                  {currentView === "admin" && currentPage === "settings" && (
+                  {view === "admin" && currentPage === "settings" && (
                     <div className="space-y-6">
                       <h1 className="text-2xl font-bold">System Settings</h1>
                       <p className="text-muted-foreground">Configure system settings and preferences.</p>

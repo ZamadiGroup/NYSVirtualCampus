@@ -6,8 +6,29 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AddUserDialog } from "@/components/AddUserDialog";
 import { AddCourseDialog } from "@/components/AddCourseDialog";
+import { LoginDialog } from "@/components/LoginDialog";
+import { usersApi } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetch = async () => {
+      try {
+        const res = await usersApi.getAll();
+        if (!mounted) return;
+        setUsers(Array.isArray(res) ? res : []);
+      } catch (e) {
+        console.warn('Failed to load users', e);
+      }
+    };
+    fetch();
+    return () => { mounted = false };
+  }, []);
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -20,6 +41,7 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <LoginDialog onLogin={() => console.log('Logged in')} />
           <AddUserDialog onUserAdded={() => console.log('User added successfully')} />
           <AddCourseDialog onCourseAdded={() => console.log('Course added successfully')} />
         </div>
@@ -61,31 +83,37 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { name: "James Omondi", role: "Student", status: "active" },
-                { name: "Grace Njeri", role: "Tutor", status: "active" },
-                { name: "Peter Kimani", role: "Student", status: "pending" },
-                { name: "Alice Wambui", role: "Student", status: "active" },
-              ].map((user, i) => (
+              {users.map((user, i) => (
                 <div
-                  key={i}
+                  key={user._id || i}
                   className="flex items-center justify-between p-3 rounded-lg border hover-elevate"
                   data-testid={`user-item-${i}`}
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-primary text-primary-foreground">
-                        {user.name.split(" ").map(n => n[0]).join("")}
+                        {user.fullName ? user.fullName.split(" ").map((n: string) => n[0]).join("") : user.username?.slice(0,2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{user.name}</p>
+                      <p className="font-medium">{user.fullName || user.username}</p>
                       <p className="text-sm text-muted-foreground">{user.role}</p>
                     </div>
                   </div>
-                  <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                    {user.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={(user.isGraduated ? 'secondary' : 'default')}>{user.isGraduated ? 'graduated' : 'active'}</Badge>
+                    {!user.isGraduated && user.role === 'student' && (
+                      <Button size="sm" onClick={async () => {
+                        try {
+                          await usersApi.graduate(user._id || user.id);
+                          toast({ title: 'Student graduated', description: `${user.fullName || user.username} was marked as graduated.` });
+                          setUsers((prev) => prev.map((u) => (u._id === user._id ? { ...u, isGraduated: true } : u)));
+                        } catch (err: any) {
+                          toast({ title: 'Error', description: err?.message || 'Failed to graduate student', variant: 'destructive' });
+                        }
+                      }}>Graduate</Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

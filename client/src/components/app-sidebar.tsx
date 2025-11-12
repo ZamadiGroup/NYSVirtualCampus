@@ -24,15 +24,22 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import nysLogo from "@assets/generated_images/NYS_Kenya_official_logo_4530e265.png";
+import { useAuth } from "@/lib/useAuth";
 
 interface AppSidebarProps {
-  userRole: "student" | "tutor" | "admin";
-  userName: string;
+  userRole?: "student" | "tutor" | "admin";
+  userName?: string;
   onNavigate: (page: string) => void;
   currentPage: string;
 }
 
 export function AppSidebar({ userRole, userName, onNavigate, currentPage }: AppSidebarProps) {
+  // Directly use the auth hook for a cleaner implementation
+  // If the parent passes userRole/userName, those take precedence.
+  const { user } = useAuth();
+  const roleToUse = userRole || (user ? (user.role as any) : 'student');
+  const nameToUse = userName || (user ? user.fullName : 'Guest User');
+
   const studentItems = [
     { title: "Home", page: "homepage", icon: Home },
     { title: "Dashboard", page: "dashboard", icon: LayoutDashboard },
@@ -59,7 +66,7 @@ export function AppSidebar({ userRole, userName, onNavigate, currentPage }: AppS
     { title: "Settings", page: "settings", icon: Settings },
   ];
 
-  const items = userRole === "student" ? studentItems : userRole === "tutor" ? tutorItems : adminItems;
+  const items = roleToUse === "student" ? studentItems : roleToUse === "tutor" ? tutorItems : adminItems;
 
   return (
     <Sidebar>
@@ -97,16 +104,16 @@ export function AppSidebar({ userRole, userName, onNavigate, currentPage }: AppS
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
+          <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {userName.split(" ").map(n => n[0]).join("")}
+              {( (nameToUse ?? 'Guest User').split(" ").map(n => n[0]).join("") )}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+            <p className="text-sm font-medium truncate">{nameToUse}</p>
+            <p className="text-xs text-muted-foreground capitalize">{roleToUse}</p>
           </div>
         </div>
       </SidebarFooter>

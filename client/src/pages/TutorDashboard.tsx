@@ -1,5 +1,6 @@
 import { StatCard } from "@/components/StatCard";
 import { CourseCard } from "@/components/CourseCard";
+import TutorCoursesGrid from "@/components/TutorCoursesGrid";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, FileCheck, TrendingUp, Plus } from "lucide-react";
@@ -25,9 +26,9 @@ export default function TutorDashboard({ onNavigate }: TutorDashboardProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button data-testid="button-create-course" onClick={() => onNavigate?.("create-course")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Course
+          <Button variant="outline" data-testid="button-create-course" onClick={() => onNavigate?.("create-course") }>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Course
           </Button>
           <Button variant="outline" data-testid="button-create-assignment" onClick={() => onNavigate?.("create-assignment")}>
             <Plus className="mr-2 h-4 w-4" />
@@ -81,44 +82,7 @@ export default function TutorDashboard({ onNavigate }: TutorDashboardProps) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          <CourseCard
-            id="1"
-            title="Introduction to Computer Science"
-            instructor="Dr. Sarah Kamau"
-            thumbnail={techThumbnail}
-            department="Technology"
-            enrolledCount={145}
-            isEnrolled={false}
-            userRole="tutor"
-            onManageEnrollment={() => console.log("Manage enrollments")}
-          >
-            <EnrollmentDialog 
-              courseId="1" 
-              courseTitle="Introduction to Computer Science" 
-              userRole="tutor"
-              onEnrollmentComplete={() => console.log("Enrollment completed")}
-            />
-          </CourseCard>
-          <CourseCard
-            id="2"
-            title="Advanced Database Systems"
-            instructor="Dr. Sarah Kamau"
-            thumbnail={businessThumbnail}
-            department="Technology"
-            enrolledCount={89}
-            isEnrolled={false}
-            userRole="tutor"
-            onManageEnrollment={() => console.log("Manage enrollments")}
-          >
-            <EnrollmentDialog 
-              courseId="2" 
-              courseTitle="Advanced Database Systems" 
-              userRole="tutor"
-              onEnrollmentComplete={() => console.log("Enrollment completed")}
-            />
-          </CourseCard>
-        </div>
+        <TutorCoursesGrid />
       </div>
 
       <div className="space-y-4">
