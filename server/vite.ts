@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
+import { pathToFileURL } from 'url';
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -30,7 +31,9 @@ export async function setupVite(app: Express, server: Server) {
   // (which can include top-level await or ESM-only constructs).
   let viteConfig: any = {};
   try {
-    viteConfig = (await import("../vite.config"))?.default || {};
+    // Build a runtime path to vite.config so bundlers won't statically resolve it during server bundling.
+    const cfgPath = path.resolve(import.meta.dirname, '..', 'vite.config');
+    viteConfig = (await import(pathToFileURL(cfgPath).href))?.default || {};
   } catch (e) {
     // If import fails, fall back to empty config — setupVite is development-only.
     viteLogger.warn("Could not import vite.config dynamically; continuing with defaults.", e as any);
