@@ -12,7 +12,7 @@ describe('AddCourseDialog', () => {
     localStorage.clear();
   });
 
-  it('prevents submit when not authenticated and shows toast', async () => {
+  it('prevents submit when not authenticated and shows toasts', async () => {
     const toast = (await import('@/hooks/use-toast')).toast as any;
     render(<AddCourseDialog />);
 
