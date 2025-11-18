@@ -10,6 +10,9 @@ import { connectDB } from "./mongodb";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+// Enable CORS; origin can be set via CLIENT_ORIGIN or CORS_ORIGIN env var (e.g. your Vercel client URL)
+const corsOrigin = process.env.CLIENT_ORIGIN || process.env.CORS_ORIGIN || '*';
+app.use(cors({ origin: corsOrigin }));
 
 app.use((req, res, next) => {
   const start = Date.now();

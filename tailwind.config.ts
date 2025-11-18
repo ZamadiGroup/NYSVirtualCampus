@@ -2,7 +2,12 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  // The Tailwind CLI / PostCSS runs with the Vite project root set to `client`.
+  // Use paths relative to the `client` folder so Tailwind sees your HTML/TSX files
+  // and generates the utilities. Previously these pointed at `./client/...`
+  // which prevented Tailwind from finding any templates and produced an
+  // almost-empty stylesheet.
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
       borderRadius: {

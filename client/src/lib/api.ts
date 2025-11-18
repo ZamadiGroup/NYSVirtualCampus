@@ -1,6 +1,9 @@
 // API service functions for communicating with the backend
 
-const API_BASE = '/api';
+// Use Vite build-time environment variable if provided (VITE_API_BASE),
+// fall back to '/api' for same-origin deployments.
+// When deploying client to Vercel and server to Render, set VITE_API_BASE to the Render URL (e.g. https://your-render-app.onrender.com)
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || '/api';
 
 // Generic API call function
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
