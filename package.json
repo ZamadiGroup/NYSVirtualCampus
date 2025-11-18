@@ -2,7 +2,7 @@
   "name": "nys-virtual-campus",
   "version": "1.0.0",
   "description": "NYS Virtual Campus platform",
-  "main": "server/index.js",
+  "main": "dist/server/index.js",
   "type": "module",
   "license": "MIT",
   "scripts": {
