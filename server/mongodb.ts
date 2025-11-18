@@ -38,6 +38,15 @@ const userSchema = new mongoose.Schema({
   // Invitation flow: placeholder accounts created for invited emails
   isInvited: { type: Boolean, default: false },
   inviteToken: { type: String },
+  // Custom permissions (override role defaults)
+  permissions: {
+    canCreateCourses: { type: Boolean },
+    canEditCourses: { type: Boolean },
+    canDeleteCourses: { type: Boolean },
+    canGradeAssignments: { type: Boolean },
+    canViewAllUsers: { type: Boolean },
+    canManageEnrollments: { type: Boolean },
+  },
 }, { timestamps: true });
 
 // Course Schema

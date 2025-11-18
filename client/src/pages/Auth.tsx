@@ -12,7 +12,7 @@ interface AuthProps {
 }
 
 export default function Auth({ onLogin }: AuthProps) {
-  const [isRegister, setIsRegister] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'admin'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +28,20 @@ export default function Auth({ onLogin }: AuthProps) {
       onLogin?.();
     } catch (err: any) {
       toast({ title: 'Login failed', description: err?.message || 'Unable to login', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const submitAdminLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setIsLoading(true);
+    try {
+      await doLogin(email, password);
+      toast({ title: 'Admin logged in', description: 'Welcome to the admin panel.' });
+      onLogin?.();
+    } catch (err: any) {
+      toast({ title: 'Admin login failed', description: err?.message || 'Invalid admin credentials', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -54,11 +68,13 @@ export default function Auth({ onLogin }: AuthProps) {
           <div className="flex justify-center">
             <img src={nysLogo} alt="NYS logo" className="w-16 h-16 object-contain mb-2" />
           </div>
-          <CardTitle className="text-center">{isRegister ? 'Register' : 'Login'}</CardTitle>
+          <CardTitle className="text-center">
+            {authMode === 'admin' ? 'Admin Login' : (authMode === 'register' ? 'Register' : 'Login')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={isRegister ? submitRegister : submitLogin} className="space-y-4">
-            {isRegister && (
+          <form onSubmit={authMode === 'admin' ? submitAdminLogin : (authMode === 'register' ? submitRegister : submitLogin)} className="space-y-4">
+            {authMode === 'register' && (
               <div className="space-y-1">
                 <Label>Full name</Label>
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
@@ -75,7 +91,7 @@ export default function Auth({ onLogin }: AuthProps) {
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
 
-            {isRegister && (
+            {authMode === 'register' && (
               <div className="space-y-1">
                 <Label>Role</Label>
                 <div className="flex gap-2">
@@ -85,18 +101,40 @@ export default function Auth({ onLogin }: AuthProps) {
               </div>
             )}
 
-            <div className="flex justify-between items-center">
-              <Button variant="ghost" type="button" onClick={() => setIsRegister(!isRegister)}>
-                {isRegister ? 'Have an account? Login' : 'Need an account? Register'}
+            <div className="flex flex-col gap-2">
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? 'Please wait...' : (authMode === 'admin' ? 'Admin Login' : (authMode === 'register' ? 'Register' : 'Login'))}
               </Button>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => { setEmail(''); setPassword(''); setFullName(''); }}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading}>{isLoading ? 'Please wait...' : (isRegister ? 'Register' : 'Login')}</Button>
-              </div>
             </div>
           </form>
+
+          {/* Auth Mode Switcher */}
+          <div className="mt-6 space-y-2 border-t pt-4">
+            <Button 
+              variant={authMode === 'login' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => { setAuthMode('login'); setEmail(''); setPassword(''); setFullName(''); }}
+              className="w-full"
+            >
+              User Login
+            </Button>
+            <Button 
+              variant={authMode === 'register' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => { setAuthMode('register'); setEmail(''); setPassword(''); setFullName(''); }}
+              className="w-full"
+            >
+              Register
+            </Button>
+            <Button 
+              variant={authMode === 'admin' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => { setAuthMode('admin'); setEmail(''); setPassword(''); setFullName(''); }}
+              className="w-full"
+            >
+              Admin Login
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -15,7 +15,8 @@
     "test:watch": "vitest --watch",
     "db:push": "drizzle-kit up:pg",
     "db:generate": "drizzle-kit generate:pg",
-    "db:migrate": "drizzle-kit up:pg"
+    "db:migrate": "drizzle-kit up:pg",
+    "init:admin": "node -r dotenv/config scripts/initializeAdmin.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

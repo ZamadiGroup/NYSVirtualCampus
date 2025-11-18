@@ -225,12 +225,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
         const courseIds = enrollments.map((e) => e.courseId);
         const courses = await Course.find({ _id: { $in: courseIds }, isActive: true }).populate('instructorId', 'fullName');
-        return res.json(courses);
+        
+        // Add enrollment count to each course
+        const coursesWithCount = await Promise.all(courses.map(async (course) => {
+          const enrollCount = await Enrollment.countDocuments({ courseId: course._id });
+          return { ...course.toObject(), enrolledCount: enrollCount };
+        }));
+        
+        return res.json(coursesWithCount);
       }
 
-      // Tutors and admins see all active courses
+      // Tutors and admins see all active courses with enrollment counts
       const allCourses = await Course.find({ isActive: true }).populate('instructorId', 'fullName');
-      res.json(allCourses);
+      
+      // Add enrollment count to each course
+      const coursesWithCount = await Promise.all(allCourses.map(async (course) => {
+        const enrollCount = await Enrollment.countDocuments({ courseId: course._id });
+        return { ...course.toObject(), enrolledCount: enrollCount };
+      }));
+      
+      res.json(coursesWithCount);
     } catch (error) {
       console.error("Error fetching courses:", error);
       res.status(500).json({ error: "Failed to fetch courses" });
@@ -393,14 +407,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const course = await Course.findById(req.params.id);
       if (!course) return res.status(404).json({ error: "Course not found" });
 
-      // If tutor, ensure they are the instructor
-      if (authReq.user.role !== 'admin' && course.instructorId.toString() !== authReq.user.userId) {
+      // If tutor, ensure they are the instructor of this course
+      if (authReq.user.role === 'tutor' && course.instructorId.toString() !== authReq.user.userId) {
         return res.status(403).json({ error: "Only the course instructor or admin can update the course" });
       }
 
-      // Allow updating of specific fields
+      // Allow updating of specific fields including instructorId
       const updatable = [
-        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive'
+        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive', 'instructorId'
       ];
 
       updatable.forEach((key) => {
@@ -513,10 +527,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ course, enrollments: enrollResults });
+      // Refresh course with enrollment count
+      const enrollCount = await Enrollment.countDocuments({ courseId: course._id });
+      const updatedCourse = await Course.findById(course._id).populate('instructorId', 'fullName');
+      
+      res.json({ course: { ...updatedCourse?.toObject(), enrolledCount: enrollCount }, enrollments: enrollResults });
     } catch (err) {
       console.error('Error enrolling students', err);
       res.status(500).json({ error: 'Failed to enroll students' });
+    }
+  });
+
+  // Get enrolled students for a course
+  router.get('/courses/:id/students', authenticate, requireRole(['tutor','admin']), async (req, res) => {
+    try {
+      const course = await Course.findById(req.params.id);
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+
+      // Only instructor or admin can view enrolled students
+      const authReq = req as AuthenticatedRequest;
+      if (authReq.user.role !== 'admin' && course.instructorId.toString() !== authReq.user.userId) {
+        return res.status(403).json({ error: 'Only the instructor or admin may view enrolled students' });
+      }
+
+      const enrollments = await Enrollment.find({ courseId: req.params.id }).populate('studentId', 'fullName email');
+      const students = enrollments.map(e => e.studentId);
+      
+      res.json({ students, count: students.length });
+    } catch (err) {
+      console.error('Error fetching enrolled students', err);
+      res.status(500).json({ error: 'Failed to fetch enrolled students' });
     }
   });
 
@@ -1058,6 +1098,404 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching admin dashboard data:", error);
       res.status(500).json({ error: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Admin: Change admin password
+  router.put("/admin/change-password", authenticate, requireRole(["admin"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "New password must be at least 6 characters" });
+      }
+
+      // Find the admin user
+      const admin = await User.findById(authReq.user.userId);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin user not found" });
+      }
+
+      // Verify current password
+      const passwordMatches = await bcrypt.compare(currentPassword, admin.password);
+      if (!passwordMatches) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      // Hash and update password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      admin.password = hashedPassword;
+      await admin.save();
+
+      res.json({ success: true, message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Error changing admin password:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  // Admin: Get all users with filters
+  router.get("/admin/users", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { role, department, page = '1', limit = '20' } = req.query;
+      
+      const pg = Math.max(1, parseInt(page as string, 10) || 1);
+      const lim = Math.max(1, Math.min(100, parseInt(limit as string, 10) || 20));
+
+      const query: any = {};
+      if (role) query.role = role;
+      if (department) query.department = department;
+
+      const total = await User.countDocuments(query);
+      const users = await User.find(query)
+        .select('-password')
+        .skip((pg - 1) * lim)
+        .limit(lim)
+        .sort({ createdAt: -1 });
+
+      res.json({ users, total, page: pg, limit: lim });
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Admin: Get user details
+  router.get("/admin/users/:id", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id).select('-password');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // Admin: Update user role
+  router.put("/admin/users/:id/role", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { role } = req.body;
+
+      if (!role || !['student', 'tutor', 'admin'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { role },
+        { new: true }
+      ).select('-password');
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ success: true, user });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+
+  // Admin: Update user details
+  router.put("/admin/users/:id", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { fullName, username, email, role, department, permissions } = req.body;
+      const updates: any = {};
+
+      if (fullName !== undefined) updates.fullName = fullName;
+      if (username !== undefined) updates.username = username;
+      if (email !== undefined) updates.email = email;
+      if (department !== undefined) updates.department = department;
+      
+      if (role !== undefined) {
+        if (!['student', 'tutor', 'admin'].includes(role)) {
+          return res.status(400).json({ error: "Invalid role" });
+        }
+        updates.role = role;
+      }
+
+      // Update permissions if provided
+      if (permissions !== undefined) {
+        updates.permissions = {
+          canCreateCourses: permissions.canCreateCourses,
+          canEditCourses: permissions.canEditCourses,
+          canDeleteCourses: permissions.canDeleteCourses,
+          canGradeAssignments: permissions.canGradeAssignments,
+          canViewAllUsers: permissions.canViewAllUsers,
+          canManageEnrollments: permissions.canManageEnrollments,
+        };
+      }
+
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        updates,
+        { new: true, runValidators: true }
+      ).select('-password');
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ success: true, user });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      // Handle duplicate key errors
+      if ((error as any).code === 11000) {
+        const field = Object.keys((error as any).keyPattern)[0];
+        return res.status(400).json({ error: `${field} already exists` });
+      }
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Admin: Delete user
+  router.delete("/admin/users/:id", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const userId = req.params.id;
+      
+      // Prevent deleting the last admin (optional safety check)
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount === 1) {
+        const user = await User.findById(userId);
+        if (user?.role === 'admin') {
+          return res.status(400).json({ error: "Cannot delete the last admin user" });
+        }
+      }
+
+      const user = await User.findByIdAndDelete(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Clean up associated data
+      await Enrollment.deleteMany({ studentId: userId });
+      await Course.deleteMany({ instructorId: userId });
+      await Submission.deleteMany({ studentId: userId });
+      await Grade.deleteMany({ studentId: userId });
+
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Admin: Get system statistics
+  router.get("/admin/statistics", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const stats = {
+        users: {
+          total: await User.countDocuments(),
+          students: await User.countDocuments({ role: 'student' }),
+          tutors: await User.countDocuments({ role: 'tutor' }),
+          admins: await User.countDocuments({ role: 'admin' }),
+        },
+        courses: {
+          total: await Course.countDocuments(),
+          active: await Course.countDocuments({ isActive: true }),
+        },
+        assignments: {
+          total: await Assignment.countDocuments(),
+          active: await Assignment.countDocuments({ isActive: true }),
+        },
+        submissions: {
+          total: await Submission.countDocuments(),
+        },
+        grades: {
+          total: await Grade.countDocuments(),
+          graded: await Grade.countDocuments({ status: 'graded' }),
+          pending: await Grade.countDocuments({ status: 'pending' }),
+        },
+        enrollments: {
+          total: await Enrollment.countDocuments(),
+        },
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
+    }
+  });
+
+  // Admin: Reset user password
+  router.post("/admin/users/:id/reset-password", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Prevent resetting admin password (admins must change their own)
+      if (user.role === 'admin') {
+        return res.status(400).json({ error: "Admin users must change their own password through settings" });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+      await user.save();
+
+      res.json({ success: true, message: `Password for ${user.fullName} has been reset` });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Enhanced Admin Dashboard Statistics with Trends
+  router.get("/admin/dashboard-stats", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      // Get current month and last month dates
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      // Current month stats
+      const totalUsers = await User.countDocuments();
+      const students = await User.countDocuments({ role: 'student' });
+      const tutors = await User.countDocuments({ role: 'tutor' });
+      const admins = await User.countDocuments({ role: 'admin' });
+      const usersThisMonth = await User.countDocuments({ createdAt: { $gte: currentMonthStart } });
+      const usersLastMonth = await User.countDocuments({
+        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+      });
+
+      // Course stats
+      const totalCourses = await Course.countDocuments();
+      const activeCourses = await Course.countDocuments({ isActive: true });
+      const coursesThisMonth = await Course.countDocuments({ createdAt: { $gte: currentMonthStart } });
+      const coursesLastMonth = await Course.countDocuments({
+        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+      });
+
+      // Enrollment stats
+      const totalEnrollments = await Enrollment.countDocuments();
+      const enrollmentsThisMonth = await Enrollment.countDocuments({ enrolledAt: { $gte: currentMonthStart } });
+      const enrollmentsLastMonth = await Enrollment.countDocuments({
+        enrolledAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+      });
+
+      // Calculate enrollment rate
+      const studentCount = await User.countDocuments({ role: 'student' });
+      const enrollmentRate = studentCount > 0 ? Math.round((totalEnrollments / studentCount) * 100) : 0;
+
+      // Get enrollments last month for comparison
+      const enrollmentsLastMonthRate = studentCount > 0
+        ? Math.round((enrollmentsLastMonth / studentCount) * 100)
+        : 0;
+
+      // Submission and Grade stats
+      const totalSubmissions = await Submission.countDocuments();
+      const totalGrades = await Grade.countDocuments();
+      const gradedCount = await Grade.countDocuments({ status: 'graded' });
+      const pendingCount = await Grade.countDocuments({ status: 'pending' });
+
+      // Assignment stats
+      const totalAssignments = await Assignment.countDocuments();
+      const activeAssignments = await Assignment.countDocuments({ isActive: true });
+
+      // Calculate trends (percentage change)
+      const userGrowthTrend = usersLastMonth > 0
+        ? Math.round(((usersThisMonth - usersLastMonth) / usersLastMonth) * 100)
+        : 0;
+
+      const courseGrowthTrend = coursesLastMonth > 0
+        ? Math.round(((coursesThisMonth - coursesLastMonth) / coursesLastMonth) * 100)
+        : 0;
+
+      const enrollmentGrowthTrend = enrollmentsLastMonth > 0
+        ? Math.round(((enrollmentsThisMonth - enrollmentsLastMonth) / enrollmentsLastMonth) * 100)
+        : 0;
+
+      // Get department-wise course distribution
+      const departmentStats = await Course.aggregate([
+        { $group: { _id: '$department', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+
+      // Get recently added users
+      const recentUsers = await User.find()
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('-password');
+
+      // Get top departments by enrollment
+      const topDepartments = await Course.aggregate([
+        { $lookup: { from: 'enrollments', localField: '_id', foreignField: 'courseId', as: 'enrollments' } },
+        { $group: {
+          _id: '$department',
+          courseCount: { $sum: 1 },
+          totalEnrollments: { $sum: { $size: '$enrollments' } }
+        }},
+        { $sort: { totalEnrollments: -1 } },
+        { $limit: 5 }
+      ]);
+
+      res.json({
+        summary: {
+          totalUsers,
+          students,
+          tutors,
+          admins,
+          totalCourses,
+          activeCourses,
+          totalEnrollments,
+          enrollmentRate,
+          totalAssignments,
+          activeAssignments,
+          totalSubmissions,
+          totalGrades,
+          gradedCount,
+          pendingCount,
+        },
+        trends: {
+          userGrowth: {
+            value: userGrowthTrend,
+            isPositive: userGrowthTrend >= 0,
+            thisMonth: usersThisMonth,
+            lastMonth: usersLastMonth,
+          },
+          courseGrowth: {
+            value: courseGrowthTrend,
+            isPositive: courseGrowthTrend >= 0,
+            thisMonth: coursesThisMonth,
+            lastMonth: coursesLastMonth,
+          },
+          enrollmentGrowth: {
+            value: enrollmentGrowthTrend,
+            isPositive: enrollmentGrowthTrend >= 0,
+            thisMonth: enrollmentsThisMonth,
+            lastMonth: enrollmentsLastMonth,
+          },
+        },
+        departments: {
+          byCount: departmentStats,
+          byEnrollment: topDepartments,
+        },
+        recent: {
+          users: recentUsers,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard statistics" });
     }
   });
 

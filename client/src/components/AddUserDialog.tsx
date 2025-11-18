@@ -29,6 +29,7 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    username: '',
     password: '',
     role: 'student' as 'student' | 'tutor' | 'admin',
     department: '',
@@ -72,6 +73,7 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         setFormData({
           fullName: '',
           email: '',
+          username: '',
           password: '',
           role: 'student',
           department: '',
@@ -135,6 +137,20 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
               />
             </div>
 
+            <div className="space-y-1">
+              <Label htmlFor="username" className="text-sm">Username</Label>
+              <Input
+                id="username"
+                placeholder="Enter username"
+                value={formData.username}
+                onChange={(e) => handleInputChange('username', e.target.value)}
+                required
+                className="h-9"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="email" className="text-sm">Email</Label>
               <Input
