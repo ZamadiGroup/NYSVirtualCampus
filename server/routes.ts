@@ -216,12 +216,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const authReq = req as AuthenticatedRequest;
     try {
       // Validate required fields
-      const { username, password, email, fullName, role } = req.body;
+      let { username, password, email, fullName, role } = req.body;
       
-      if (!username || !password || !email || !fullName) {
+      if (!password || !email || !fullName) {
         return res.status(400).json({ 
-          error: "Missing required fields: username, password, email, and fullName are required" 
+          error: "Missing required fields: password, email, and fullName are required" 
         });
+      }
+
+      // Auto-generate username from email if not provided
+      if (!username) {
+        username = email.split('@')[0];
       }
 
       // Check if user already exists
@@ -232,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const payload: any = { ...req.body };
+      const payload: any = { ...req.body, username };
       if (payload.password) {
         payload.password = await bcrypt.hash(payload.password, 10);
       }
@@ -741,6 +746,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query = { ...query, courseId: courseId as string } as any;
       }
       
+      // If user is a student, only return assignments for courses they're enrolled in
+      if (authReq.user.role === 'student') {
+        const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
+        const enrolledCourseIds = enrollments.map((e) => e.courseId);
+        query = { ...query, courseId: { $in: enrolledCourseIds } } as any;
+      }
+      
       const allAssignments = await Assignment.find(query).populate('courseId', 'title');
       res.json(allAssignments);
     } catch (error) {
@@ -812,17 +824,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: graduate a student (set isGraduated flag)
+  // Admin: graduate a student (set isGraduated flag and remove from all courses)
   router.post('/users/:id/graduate', authenticate, requireRole(['admin']), async (req, res) => {
     try {
       const user = await User.findById(req.params.id);
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      if (user.role !== 'student') return res.status(400).json({ error: 'Only students can be graduated' });
-      user.isGraduated = true;
-      await user.save();
-      res.json({ success: true, user });
-    } catch (err) {
-      console.error('Error graduating student', err);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (user.role !== 'student') {
+        return res.status(400).json({ error: 'Only students can be graduated' });
+      }
+      
+      // Remove student from all courses by deleting their enrollments
+      const deletedEnrollments = await Enrollment.deleteMany({ studentId: req.params.id });
+      console.log(`Graduated student ${user.fullName}: removed from ${deletedEnrollments.deletedCount} courses`);
+      
+      // Mark student as graduated
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        { isGraduated: true },
+        { new: true }
+      );
+      
+      res.json({ 
+        success: true, 
+        user: updatedUser,
+        removedFromCourses: deletedEnrollments.deletedCount 
+      });
+    } catch (err: any) {
+      console.error('Error graduating student:', err?.message || err);
       res.status(500).json({ error: 'Failed to graduate student' });
     }
   });
@@ -843,8 +873,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // initial match on submission-level fields
       const match: any = {};
-      if (assignmentId) match.assignmentId = mongoose.Types.ObjectId(assignmentId);
-      if (studentId) match.studentId = mongoose.Types.ObjectId(studentId);
+      if (assignmentId) match.assignmentId = new mongoose.Types.ObjectId(assignmentId);
+      if (studentId) match.studentId = new mongoose.Types.ObjectId(studentId);
       if (Object.keys(match).length) pipeline.push({ $match: match });
 
       // lookup assignment
@@ -870,12 +900,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // filter by courseId if provided
       if (courseId) {
-        pipeline.push({ $match: { 'assignment.courseId': mongoose.Types.ObjectId(courseId) } });
+        pipeline.push({ $match: { 'assignment.courseId': new mongoose.Types.ObjectId(courseId) } });
       }
 
       // Enforce tutor access: only submissions for courses they instruct
       if (authReq.user.role === 'tutor') {
-        pipeline.push({ $match: { 'course.instructorId': mongoose.Types.ObjectId(authReq.user.userId) } });
+        pipeline.push({ $match: { 'course.instructorId': new mongoose.Types.ObjectId(authReq.user.userId) } });
       }
 
       // filter by status if requested
@@ -1088,6 +1118,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error('Failed to delete announcement', err);
       res.status(500).json({ error: 'Failed to delete announcement' });
+    }
+  });
+
+  // Get all enrollments (for tutors/admins to see which students are in which courses)
+  router.get("/enrollments", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      // If tutor, only return enrollments for courses they instruct
+      if (authReq.user.role === 'tutor') {
+        const tutorCourses = await Course.find({ instructorId: authReq.user.userId }).select('_id');
+        const tutorCourseIds = tutorCourses.map(c => c._id);
+        const enrollments = await Enrollment.find({ courseId: { $in: tutorCourseIds } })
+          .populate('studentId', 'name email username')
+          .populate('courseId', 'title');
+        return res.json(enrollments);
+      }
+      // Admin can see all enrollments
+      const enrollments = await Enrollment.find()
+        .populate('studentId', 'name email username')
+        .populate('courseId', 'title');
+      res.json(enrollments);
+    } catch (err) {
+      console.error('Failed to fetch enrollments', err);
+      res.status(500).json({ error: 'Failed to fetch enrollments' });
     }
   });
 

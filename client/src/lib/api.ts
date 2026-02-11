@@ -165,6 +165,7 @@ export const announcementsApi = {
 
 // Enrollments API
 export const enrollmentsApi = {
+  getAll: () => apiCall('/enrollments'),
   create: (courseId: string) => apiCall('/enrollments', {
     method: 'POST',
     body: JSON.stringify({ courseId }),

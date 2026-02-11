@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,18 +27,18 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
-    fullName: '',
-    email: '',
-    password: '',
-    role: 'student' as 'student' | 'tutor' | 'admin',
-    department: '',
+    username: "",
+    fullName: "",
+    email: "",
+    password: "",
+    role: "student" as "student" | "tutor" | "admin",
+    department: "",
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -46,17 +46,7 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
     e.preventDefault();
     setIsLoading(true);
 
-    // Validation
-    if (!formData.username?.trim()) {
-      toast({
-        title: "Missing username",
-        description: "Please enter a username for the user.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
+    // Validation - username is optional (auto-generated from email if empty)
     if (!formData.fullName?.trim()) {
       toast({
         title: "Missing name",
@@ -87,21 +77,27 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
       return;
     }
 
+    // Auto-generate username from email if not provided
+    const dataToSubmit = {
+      ...formData,
+      username: formData.username?.trim() || formData.email.split("@")[0],
+    };
+
     try {
       // If an auth token is present, create the user via the admin-protected endpoint.
       // Otherwise fall back to the public register endpoint.
-      const token = localStorage.getItem('token');
-      const url = token ? '/api/users' : '/api/auth/register';
+      const token = localStorage.getItem("token");
+      const url = token ? "/api/users" : "/api/auth/register";
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSubmit),
       });
 
       if (response.ok) {
@@ -111,12 +107,12 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         });
         setIsOpen(false);
         setFormData({
-          username: '',
-          fullName: '',
-          email: '',
-          password: '',
-          role: 'student',
-          department: '',
+          username: "",
+          fullName: "",
+          email: "",
+          password: "",
+          role: "student",
+          department: "",
         });
         onUserAdded?.();
       } else {
@@ -136,10 +132,11 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         });
       }
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
       toast({
         title: "Error Creating User",
-        description: "Network error. Please check your connection and try again.",
+        description:
+          "Network error. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -165,24 +162,30 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="username" className="text-sm">Username</Label>
+              <Label htmlFor="username" className="text-sm">
+                Username{" "}
+                <span className="text-muted-foreground text-xs">
+                  (optional)
+                </span>
+              </Label>
               <Input
                 id="username"
-                placeholder="Username (unique)"
+                placeholder="Auto-generated from email"
                 value={formData.username}
-                onChange={(e) => handleInputChange('username', e.target.value)}
-                required
+                onChange={(e) => handleInputChange("username", e.target.value)}
                 className="h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="fullName" className="text-sm">Full Name</Label>
+              <Label htmlFor="fullName" className="text-sm">
+                Full Name
+              </Label>
               <Input
                 id="fullName"
                 placeholder="Enter full name"
                 value={formData.fullName}
-                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                onChange={(e) => handleInputChange("fullName", e.target.value)}
                 required
                 className="h-9"
               />
@@ -190,13 +193,15 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="email" className="text-sm">Email</Label>
+            <Label htmlFor="email" className="text-sm">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
               placeholder="Enter email address"
               value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              onChange={(e) => handleInputChange("email", e.target.value)}
               required
               className="h-9"
             />
@@ -204,21 +209,28 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="password" className="text-sm">Password</Label>
+              <Label htmlFor="password" className="text-sm">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter password"
                 value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
+                onChange={(e) => handleInputChange("password", e.target.value)}
                 required
                 className="h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="role" className="text-sm">Role</Label>
-              <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+              <Label htmlFor="role" className="text-sm">
+                Role
+              </Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => handleInputChange("role", value)}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -232,12 +244,14 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="department" className="text-sm">Department</Label>
+            <Label htmlFor="department" className="text-sm">
+              Department
+            </Label>
             <Input
               id="department"
               placeholder="Enter department (optional)"
               value={formData.department}
-              onChange={(e) => handleInputChange('department', e.target.value)}
+              onChange={(e) => handleInputChange("department", e.target.value)}
               className="h-9"
             />
           </div>

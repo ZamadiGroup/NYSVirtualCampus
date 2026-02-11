@@ -58,6 +58,10 @@ const courseSchema = new mongoose.Schema({
   estimatedDuration: { type: String },
   duration: { type: Number }, // Duration in hours (set by tutor)
   isMandatory: { type: Boolean, default: true }, // All students must join mandatory courses
+  // Course template type: Standard, Workshop, Self-Paced, Bootcamp
+  template: { type: String, enum: ['Standard', 'Workshop', 'Self-Paced', 'Bootcamp'], default: 'Standard' },
+  startDate: { type: Date },
+  endDate: { type: Date },
   // Chapters: each chapter can have notes and multiple materials (ppt/pdf links)
   chapters: [{
     title: { type: String },
@@ -70,7 +74,8 @@ const courseSchema = new mongoose.Schema({
   }],
   enrollEmails: [{ type: String }],
   enrollmentKey: { type: String, required: true, unique: true },
-  isActive: { type: Boolean, default: true }
+  isActive: { type: Boolean, default: true },
+  archived: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Assignment Schema
