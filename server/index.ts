@@ -59,28 +59,43 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   
-  // Check if we have BOTH the source client files AND built dist
-  // If either is missing, we're in a deployed environment -> use serveStatic
-  // Use process.cwd() to get project root (static from where Node runs)
+  // Determine if we're in development or production
+  // Development: source files exist (client/index.html)
+  // Production: only built files exist (dist/public)
   const clientSourcePath = path.resolve(process.cwd(), "client", "index.html");
   const distPublicPath = path.resolve(process.cwd(), "dist", "public");
   const hasClientSource = fs.existsSync(clientSourcePath);
   const hasDistPublic = fs.existsSync(distPublicPath);
   
-  log(`[Startup] cwd=${process.cwd()}`);
-  log(`[Startup] hasClientSource=${hasClientSource}, hasDistPublic=${hasDistPublic}`);
+  log(`[Startup] Environment: cwd=${process.cwd()}`);
+  log(`[Startup] Source files: client/index.html=${hasClientSource}`);
+  log(`[Startup] Built files: dist/public=${hasDistPublic}`);
   
-  // Only use setupVite if source files exist (development)
-  // Otherwise always use serveStatic (production)
+  // Only use development mode if source files exist
+  // Production mode requires built files to exist
   const isDevelopment = hasClientSource;
   
-  log(`[Startup] Using ${isDevelopment ? "DEVELOPMENT" : "PRODUCTION"} mode (setupVite=${isDevelopment})`);
+  if (isDevelopment && !hasDistPublic) {
+    log(`[Startup] Development mode - Vite will compile on-demand`);
+  } else if (!isDevelopment && hasDistPublic) {
+    log(`[Startup] Production mode - Serving pre-built static files`);
+  } else if (!isDevelopment && !hasDistPublic) {
+    throw new Error(
+      `FATAL: No build found at ${distPublicPath}.\n` +
+      `Production deployment requires running "npm run build" first.\n` +
+      `This should be done automatically in your build step, but please verify.`
+    );
+  }
 
-  
-  if (isDevelopment) {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+  try {
+    if (isDevelopment) {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+  } catch (err) {
+    log(`[Startup] FATAL ERROR during setup: ${err}`);
+    throw err;
   }
 
   // Ensure uploads directory exists and serve it at /uploads

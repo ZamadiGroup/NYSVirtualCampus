@@ -69,17 +69,40 @@ export async function setupVite(app: Express, server: Server) {
 
 export function serveStatic(app: Express) {
   const publicPath = path.resolve(process.cwd(), "dist", "public");
+  const indexPath = path.join(publicPath, "index.html");
+
+  log(`[serveStatic] Checking for build at: ${publicPath}`);
 
   if (!fs.existsSync(publicPath)) {
-    throw new Error(
-      `Could not find the build directory: ${publicPath}. Did you run "vite build"?`
-    );
+    const errorMsg = `Build directory not found: ${publicPath}\n` +
+      `Please run "npm run build" before starting in production.`;
+    log(`[serveStatic] ERROR: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
+  if (!fs.existsSync(indexPath)) {
+    const errorMsg = `index.html not found in: ${indexPath}\n` +
+      `Your build may be incomplete. Please run "npm run build" again.`;
+    log(`[serveStatic] ERROR: ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+
+  log(`[serveStatic] Serving static files from: ${publicPath}`);
   app.use(express.static(publicPath));
 
-  // SPA fallback
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(publicPath, "index.html"));
+  // SPA fallback: serve index.html for all unmatched routes
+  // This ensures client-side routing works correctly
+  app.get("*", (_req, res, next) => {
+    // Don't intercept API routes
+    if (_req.path.startsWith("/api") || _req.path.startsWith("/uploads")) {
+      return next();
+    }
+
+    try {
+      res.sendFile(indexPath);
+    } catch (error) {
+      log(`[serveStatic] Error serving index.html: ${error}`);
+      res.status(500).send("Application error");
+    }
   });
 }
