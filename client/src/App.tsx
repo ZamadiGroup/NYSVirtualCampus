@@ -35,7 +35,7 @@ import Announcements, { type Announcement } from "@/pages/Announcements";
 import SubmissionsPage from "@/pages/Submissions";
 import SystemSettings from "@/pages/SystemSettings";
 import { useAuth } from "@/lib/useAuth";
-import { assignmentsApi } from "@/lib/api";
+import { assignmentsApi, announcementsApi } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import LoginDialog from "@/components/LoginDialog";
 // TutorAssignments was temporarily added; navigation will render the full TutorDashboard instead.
@@ -121,8 +121,27 @@ function App() {
     }
   };
 
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await announcementsApi.getAll();
+      const normalized: Announcement[] = Array.isArray(res)
+        ? res.map((a: any) => ({
+            id: String(a._id || a.id),
+            message: a.message,
+            authorRole: "tutor",
+            authorName: a.authorId?.fullName || "Staff",
+            createdAt: a.createdAt,
+          }))
+        : [];
+      setAnnouncements(normalized);
+    } catch (err) {
+      console.error("Failed to fetch announcements", err);
+    }
+  };
+
   React.useEffect(() => {
     fetchAssignments();
+    fetchAnnouncements();
   }, []);
 
   // Sync hash-based navigation for simple full-page auth routing (e.g. #auth)
@@ -274,7 +293,13 @@ function App() {
                           onAssignmentsChange={(a: any[]) => setAssignments(a)}
                         />
                       ) : (
-                        <CourseList userRole={view} />
+                        <CourseList
+                          userRole={view}
+                          onOpenCourse={(id: string) => {
+                            setSelectedCourseId(id);
+                            setCurrentPage("course-detail");
+                          }}
+                        />
                       ))}
                     {currentPage === "course-detail" && (
                       <CourseDetail courseId={selectedCourseId || undefined} />
@@ -592,24 +617,32 @@ function App() {
                                 !a.dueDate ||
                                 new Date(a.dueDate).getTime() >= Date.now(),
                             )
-                            .map((a) => (
-                              <Card key={a.id} className="p-4">
-                                <div className="space-y-2">
-                                  <h3 className="font-semibold">{a.title}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Course: {a.courseId} • Type: {a.type}
-                                  </p>
-                                  <Button
-                                    onClick={() => {
-                                      setSelectedAssignmentId(a.id);
-                                      setCurrentPage("assignment-detail");
-                                    }}
-                                  >
-                                    Open
-                                  </Button>
-                                </div>
-                              </Card>
-                            ))}
+                            .map((a) => {
+                              const courseLabel =
+                                typeof (a as any).courseId === "object"
+                                  ? (a as any).courseId?.title ||
+                                    (a as any).courseId?._id ||
+                                    "Unknown Course"
+                                  : (a as any).courseId || "Unknown Course";
+                              return (
+                                <Card key={a.id} className="p-4">
+                                  <div className="space-y-2">
+                                    <h3 className="font-semibold">{a.title}</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      Course: {courseLabel} • Type: {a.type}
+                                    </p>
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedAssignmentId(a.id);
+                                        setCurrentPage("assignment-detail");
+                                      }}
+                                    >
+                                      Open
+                                    </Button>
+                                  </div>
+                                </Card>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
@@ -705,12 +738,7 @@ function App() {
                     )}
 
                     {view === "tutor" && currentPage === "analytics" && (
-                      <div className="space-y-6">
-                        <h1 className="text-2xl font-bold">Analytics</h1>
-                        <p className="text-muted-foreground">
-                          View performance analytics and insights.
-                        </p>
-                      </div>
+                      <Analytics />
                     )}
 
                     {/* Admin specific pages */}

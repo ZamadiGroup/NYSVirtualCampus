@@ -30,7 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usersApi, coursesApi, type ApiUser, type ApiCourse } from "@/lib/api";
+import {
+  usersApi,
+  coursesApi,
+  enrollmentsApi,
+  type ApiUser,
+  type ApiCourse,
+} from "@/lib/api";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,12 +45,14 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [courses, setCourses] = useState<ApiCourse[]>([]);
   const [tutors, setTutors] = useState<ApiUser[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [enrollCourse, setEnrollCourse] = useState<ApiCourse | null>(null);
   const [enrollStudent, setEnrollStudent] = useState<string>("");
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [transferCourse, setTransferCourse] = useState<ApiCourse | null>(null);
   const [transferToTutor, setTransferToTutor] = useState<string>("");
+  const [courseTutorFilter, setCourseTutorFilter] = useState<string>("all");
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(
     new Set(),
   );
@@ -67,7 +75,13 @@ export default function AdminDashboard() {
     try {
       const res = await coursesApi.getAll().catch(() => []);
       const normalized = Array.isArray(res)
-        ? res.map((c: any) => ({ ...c, id: (c as any).id || (c as any)._id }))
+        ? res.map((c: any) => ({
+            ...c,
+            id: (c as any).id || (c as any)._id,
+            instructorId: (c as any).instructorId?._id
+              ? String((c as any).instructorId._id)
+              : String((c as any).instructorId || ""),
+          }))
         : [];
       setCourses(normalized);
     } catch (e) {
@@ -75,10 +89,32 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const loadEnrollments = useCallback(async () => {
+    try {
+      const res = await enrollmentsApi.getAll().catch(() => []);
+      const normalized = Array.isArray(res)
+        ? res.map((e: any) => ({
+            _id: e._id,
+            id: e._id || e.id,
+            studentId: e.studentId?._id
+              ? String(e.studentId._id)
+              : String(e.studentId || ""),
+            courseId: e.courseId?._id
+              ? String(e.courseId._id)
+              : String(e.courseId || ""),
+          }))
+        : [];
+      setEnrollments(normalized);
+    } catch (e) {
+      console.warn("Failed to load enrollments", e);
+    }
+  }, []);
+
   useEffect(() => {
     loadUsers();
     loadCourses();
-  }, [loadUsers, loadCourses]);
+    loadEnrollments();
+  }, [loadUsers, loadCourses, loadEnrollments]);
 
   const stats = useMemo(() => {
     return {
@@ -88,6 +124,20 @@ export default function AdminDashboard() {
       totalStudents: users.filter((u) => u.role === "student").length,
     };
   }, [users, courses]);
+
+  const filteredCourses = useMemo(() => {
+    if (courseTutorFilter === "all") return courses;
+    return courses.filter((c) => String(c.instructorId) === courseTutorFilter);
+  }, [courses, courseTutorFilter]);
+
+  const enrollmentCountsByCourse = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of enrollments) {
+      const courseId = String(e.courseId || "");
+      map.set(courseId, (map.get(courseId) || 0) + 1);
+    }
+    return map;
+  }, [enrollments]);
 
   const handleGraduateStudent = async (userId: string, fullName: string) => {
     try {
@@ -119,13 +169,7 @@ export default function AdminDashboard() {
     try {
       setSaving(true);
       const student = users.find((u) => u.id === enrollStudent);
-      const updatedEnrollEmails = [
-        ...(enrollCourse.enrollEmails || []),
-        student?.email || "",
-      ];
-      await coursesApi.update(enrollCourse.id, {
-        enrollEmails: updatedEnrollEmails,
-      });
+      await coursesApi.enroll(enrollCourse.id, [student?.email || ""]);
       toast({
         title: "Enrolled",
         description: `${student?.fullName} enrolled in ${enrollCourse.title}`,
@@ -134,6 +178,7 @@ export default function AdminDashboard() {
       setEnrollStudent("");
       setEnrollCourse(null);
       loadCourses();
+      loadEnrollments();
     } catch (err: any) {
       toast({
         title: "Error",
@@ -363,11 +408,29 @@ export default function AdminDashboard() {
         <TabsContent value="allCourses" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>All Courses ({courses.length})</CardTitle>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle>All Courses ({filteredCourses.length})</CardTitle>
+                <Select
+                  value={courseTutorFilter}
+                  onValueChange={setCourseTutorFilter}
+                >
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Filter by tutor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tutors</SelectItem>
+                    {tutors.map((tutor) => (
+                      <SelectItem key={tutor.id} value={String(tutor.id)}>
+                        {tutor.fullName || tutor.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {courses.map((course) => {
+                {filteredCourses.map((course) => {
                   const instructor = users.find(
                     (u) => u.id === course.instructorId,
                   );
@@ -459,7 +522,8 @@ export default function AdminDashboard() {
                             value={enrollCourse?.id || ""}
                             onValueChange={(val) =>
                               setEnrollCourse(
-                                courses.find((c) => c.id === val) || null,
+                                filteredCourses.find((c) => c.id === val) ||
+                                  null,
                               )
                             }
                           >
@@ -467,7 +531,7 @@ export default function AdminDashboard() {
                               <SelectValue placeholder="Select course" />
                             </SelectTrigger>
                             <SelectContent>
-                              {courses.map((c) => (
+                              {filteredCourses.map((c) => (
                                 <SelectItem key={c.id} value={c.id}>
                                   {c.title}
                                 </SelectItem>
@@ -526,7 +590,8 @@ export default function AdminDashboard() {
                             value={transferCourse?.id || ""}
                             onValueChange={(val) =>
                               setTransferCourse(
-                                courses.find((c) => c.id === val) || null,
+                                filteredCourses.find((c) => c.id === val) ||
+                                  null,
                               )
                             }
                           >
@@ -534,7 +599,7 @@ export default function AdminDashboard() {
                               <SelectValue placeholder="Select course" />
                             </SelectTrigger>
                             <SelectContent>
-                              {courses.map((c) => (
+                              {filteredCourses.map((c) => (
                                 <SelectItem key={c.id} value={c.id}>
                                   {c.title}
                                 </SelectItem>
@@ -629,7 +694,9 @@ export default function AdminDashboard() {
                             Facilitator: {instructor?.fullName || "Unassigned"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Enrolled: {course.enrollEmails?.length || 0}
+                            Enrolled:{" "}
+                            {enrollmentCountsByCourse.get(String(course.id)) ||
+                              0}
                           </p>
                         </div>
                         <div className="flex gap-2">

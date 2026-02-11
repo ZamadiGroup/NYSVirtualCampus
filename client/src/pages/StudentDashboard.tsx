@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { coursesApi, assignmentsApi } from "@/lib/api";
+import { coursesApi, assignmentsApi, announcementsApi } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
 import { CourseCard } from "@/components/CourseCard";
 import { AssignmentCard } from "@/components/AssignmentCard";
@@ -29,6 +29,7 @@ export default function StudentDashboard({
   // State for enrolled and available courses
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
 
   const [availableCourses, setAvailableCourses] = useState([
     {
@@ -139,6 +140,24 @@ export default function StudentDashboard({
       mounted = false;
     };
   }, [enrolledCourses]);
+
+  // Fetch announcements for enrolled courses (server filters by enrollment)
+  useEffect(() => {
+    let mounted = true;
+    const fetchAnnouncements = async () => {
+      try {
+        const res = await announcementsApi.getAll();
+        if (!mounted) return;
+        setAnnouncements(Array.isArray(res) ? res : []);
+      } catch (e) {
+        console.warn("Failed to fetch announcements", e);
+      }
+    };
+    fetchAnnouncements();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Function to handle enrollment
   const handleEnroll = (courseId: string) => {
@@ -312,25 +331,26 @@ export default function StudentDashboard({
         </TabsContent>
 
         <TabsContent value="announcements" className="space-y-4">
-          {enrolledCourses.length > 0 ? (
+          {announcements.length > 0 ? (
             <div className="max-w-3xl space-y-4">
-              <AnnouncementCard
-                id="1"
-                title="Mid-Semester Exam Schedule Released"
-                content="The mid-semester examination timetable has been published. Please check your course pages for specific dates and venues."
-                courseName="Introduction to Computer Science"
-                postedBy="Dr. Sarah Kamau"
-                postedAt={today}
-                priority="important"
-              />
-              <AnnouncementCard
-                id="2"
-                title="New Learning Materials Available"
-                content="Week 8 lecture notes and supplementary reading materials have been uploaded. Review them before our next session."
-                courseName="Business Management"
-                postedBy="Prof. John Mwangi"
-                postedAt={yesterday}
-              />
+              {announcements.map((a: any) => (
+                <AnnouncementCard
+                  key={a._id || a.id}
+                  id={String(a._id || a.id)}
+                  title={a.title}
+                  content={a.message}
+                  courseName={a.courseId?.title || "General"}
+                  postedBy={a.authorId?.fullName || "Staff"}
+                  postedAt={a.createdAt ? new Date(a.createdAt) : today}
+                  priority={a.isGlobal ? "important" : "normal"}
+                />
+              ))}
+            </div>
+          ) : enrolledCourses.length > 0 ? (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">
+                No announcements yet. Check back later.
+              </p>
             </div>
           ) : (
             <div className="text-center py-10">

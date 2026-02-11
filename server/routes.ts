@@ -1072,6 +1072,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isGlobal === "true") {
         query.isGlobal = true;
       }
+
+      if (authReq.user.role === 'student') {
+        const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
+        const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+        if (courseId) {
+          const isEnrolled = enrolledCourseIds.some((id) => id.toString() === String(courseId));
+          if (!isEnrolled) {
+            return res.status(403).json({ error: 'You are not enrolled in this course' });
+          }
+        } else if (isGlobal === "true") {
+          query.isGlobal = true;
+        } else {
+          query = {
+            $or: [
+              { isGlobal: true },
+              { courseId: { $in: enrolledCourseIds } },
+            ],
+          };
+        }
+      }
       
       const allAnnouncements = await Announcement.find(query)
         .populate('authorId', 'fullName')
@@ -1130,18 +1151,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tutorCourses = await Course.find({ instructorId: authReq.user.userId }).select('_id');
         const tutorCourseIds = tutorCourses.map(c => c._id);
         const enrollments = await Enrollment.find({ courseId: { $in: tutorCourseIds } })
-          .populate('studentId', 'name email username')
+          .populate('studentId', 'fullName email username')
           .populate('courseId', 'title');
         return res.json(enrollments);
       }
       // Admin can see all enrollments
       const enrollments = await Enrollment.find()
-        .populate('studentId', 'name email username')
+        .populate('studentId', 'fullName email username')
         .populate('courseId', 'title');
       res.json(enrollments);
     } catch (err) {
       console.error('Failed to fetch enrollments', err);
       res.status(500).json({ error: 'Failed to fetch enrollments' });
+    }
+  });
+
+  // Delete an enrollment (remove student from course) - for tutors/admins
+  router.delete("/enrollments/:courseId/:studentId", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const { courseId, studentId } = req.params;
+      
+      // If tutor, verify they own the course
+      if (authReq.user.role === 'tutor') {
+        const course = await Course.findById(courseId);
+        if (!course) {
+          return res.status(404).json({ error: 'Course not found' });
+        }
+        if (course.instructorId.toString() !== authReq.user.userId) {
+          return res.status(403).json({ error: 'Only the course instructor can remove students' });
+        }
+      }
+      
+      // Delete the enrollment
+      const result = await Enrollment.deleteOne({ courseId, studentId });
+      
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ error: 'Enrollment not found' });
+      }
+      
+      res.json({ success: true, message: 'Student removed from course' });
+    } catch (err) {
+      console.error('Failed to delete enrollment', err);
+      res.status(500).json({ error: 'Failed to remove student from course' });
     }
   });
 

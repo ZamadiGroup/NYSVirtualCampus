@@ -30,9 +30,13 @@ interface Course {
 
 interface CourseListProps {
   userRole?: "student" | "tutor" | "admin";
+  onOpenCourse?: (id: string) => void;
 }
 
-export default function CourseList({ userRole = "student" }: CourseListProps) {
+export default function CourseList({
+  userRole = "student",
+  onOpenCourse,
+}: CourseListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -51,7 +55,10 @@ export default function CourseList({ userRole = "student" }: CourseListProps) {
     try {
       setLoading(true);
       setError(null);
-      const data = await coursesApi.getAll();
+      const data =
+        userRole === "student"
+          ? await coursesApi.getMyEnrollments()
+          : await coursesApi.getAll();
       const normalizedCourses = Array.isArray(data)
         ? data.map((c: any) => ({
             ...c,
@@ -69,7 +76,7 @@ export default function CourseList({ userRole = "student" }: CourseListProps) {
 
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [userRole]);
 
   // Refresh handler for when courses are updated
   const handleCourseUpdate = () => {
@@ -109,10 +116,12 @@ export default function CourseList({ userRole = "student" }: CourseListProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold" data-testid="text-page-title">
-          Browse Courses
+          {userRole === "student" ? "My Courses" : "Browse Courses"}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Explore and enroll in available courses
+          {userRole === "student"
+            ? "Your enrolled courses"
+            : "Explore and enroll in available courses"}
         </p>
       </div>
 
@@ -176,12 +185,18 @@ export default function CourseList({ userRole = "student" }: CourseListProps) {
                 0
               }
               userRole={userRole}
-              onEnroll={(enrollmentKey) => {
-                console.log(
-                  `Enroll in ${course.title} with key: ${enrollmentKey}`,
-                );
-                // TODO: Implement actual enrollment API call
-              }}
+              isEnrolled={userRole === "student"}
+              onContinue={() => onOpenCourse?.(course.id)}
+              onEnroll={
+                userRole === "student"
+                  ? undefined
+                  : (enrollmentKey) => {
+                      console.log(
+                        `Enroll in ${course.title} with key: ${enrollmentKey}`,
+                      );
+                      // TODO: Implement actual enrollment API call
+                    }
+              }
               onUpdate={handleCourseUpdate}
             />
           ))}

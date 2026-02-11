@@ -170,6 +170,9 @@ export const enrollmentsApi = {
     method: 'POST',
     body: JSON.stringify({ courseId }),
   }),
+  delete: (courseId: string, studentId: string) => apiCall(`/enrollments/${courseId}/${studentId}`, {
+    method: 'DELETE',
+  }),
 };
 
 // Admin API

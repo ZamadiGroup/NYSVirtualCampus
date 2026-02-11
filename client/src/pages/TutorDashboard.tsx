@@ -265,7 +265,11 @@ export default function TutorDashboard({
         courseId: e.courseId?._id
           ? String(e.courseId._id)
           : String(e.courseId || ""),
-        studentName: e.studentId?.name || e.studentId?.username || "",
+        studentName:
+          e.studentId?.fullName ||
+          e.studentId?.name ||
+          e.studentId?.username ||
+          "",
         studentEmail: e.studentId?.email || "",
         enrolledAt: e.enrolledAt,
         createdAt: e.createdAt,
@@ -359,18 +363,35 @@ export default function TutorDashboard({
     }
   };
 
-  const handleRemoveStudent = (studentId: string, courseId: string) => {
+  const handleRemoveStudent = async (studentId: string, courseId: string) => {
     if (confirm("Remove this student from the course?")) {
-      // Remove the enrollment for this student from this course
-      setEnrollments((prev) =>
-        prev.filter(
-          (e) =>
-            !(
-              String(e.studentId) === String(studentId) &&
-              String(e.courseId) === String(courseId)
-            ),
-        ),
-      );
+      try {
+        // Remove the enrollment from the database
+        await enrollmentsApi.delete(courseId, studentId);
+
+        // Remove from local state
+        setEnrollments((prev) =>
+          prev.filter(
+            (e) =>
+              !(
+                String(e.studentId) === String(studentId) &&
+                String(e.courseId) === String(courseId)
+              ),
+          ),
+        );
+
+        toast({
+          title: "Student removed",
+          description: "Student has been removed from the course",
+        });
+      } catch (error: any) {
+        console.error("Failed to remove student:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to remove student",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -588,7 +609,11 @@ export default function TutorDashboard({
           courseId: e.courseId?._id
             ? String(e.courseId._id)
             : String(e.courseId || ""),
-          studentName: e.studentId?.name || e.studentId?.username || "",
+          studentName:
+            e.studentId?.fullName ||
+            e.studentId?.name ||
+            e.studentId?.username ||
+            "",
           studentEmail: e.studentId?.email || "",
           enrolledAt: e.enrolledAt,
           createdAt: e.createdAt,
@@ -1384,7 +1409,14 @@ export default function TutorDashboard({
                                   }}
                                   className="rounded"
                                 />
-                                <span>{student.name}</span>
+                                <span>
+                                  {student.fullName ||
+                                    student.name ||
+                                    student.studentName ||
+                                    student.email ||
+                                    student.studentEmail ||
+                                    "(no name)"}
+                                </span>
                               </label>
                             ),
                           )}
@@ -1465,7 +1497,9 @@ export default function TutorDashboard({
                             className="flex items-center justify-between p-3 border rounded-lg"
                           >
                             <div>
-                              <p className="font-medium">{student.name}</p>
+                              <p className="font-medium">
+                                {student.fullName || student.name}
+                              </p>
                               <p className="text-sm text-muted-foreground">
                                 {student.email}
                               </p>

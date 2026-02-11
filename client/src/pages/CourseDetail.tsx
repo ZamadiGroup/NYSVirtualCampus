@@ -22,7 +22,12 @@ import {
 } from "lucide-react";
 import techThumbnail from "@assets/generated_images/Technology_course_thumbnail_5e4c2c8c.png";
 import { useEffect, useState } from "react";
-import { coursesApi, assignmentsApi, ApiCourse } from "@/lib/api";
+import {
+  coursesApi,
+  assignmentsApi,
+  announcementsApi,
+  ApiCourse,
+} from "@/lib/api";
 import CreateAssignment, { type AssignmentDraft } from "./CreateAssignment";
 import {
   Dialog,
@@ -66,6 +71,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
   const [editDepartment, setEditDepartment] = useState("");
   const [savingCourse, setSavingCourse] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isEditAssignmentOpen, setIsEditAssignmentOpen] = useState(false);
   const [isCreateAssignmentOpen, setIsCreateAssignmentOpen] = useState(false);
   const [editAssignmentDraft, setEditAssignmentDraft] =
@@ -228,6 +234,16 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
             if (mounted) setAssignments(Array.isArray(ares) ? ares : []);
           } catch (e) {
             console.error("Failed to load assignments for course", e);
+          }
+
+          // load announcements for this course
+          try {
+            const ann = await announcementsApi.getAll(
+              String((c as any)._id || (c as any).id),
+            );
+            if (mounted) setAnnouncements(Array.isArray(ann) ? ann : []);
+          } catch (e) {
+            console.error("Failed to load announcements for course", e);
           }
         } else {
           const all = await coursesApi.getAll();
@@ -1058,15 +1074,24 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
 
         <TabsContent value="announcements" className="space-y-4">
           <div className="max-w-3xl space-y-4">
-            <AnnouncementCard
-              id="1"
-              title="Mid-Semester Exam Schedule Released"
-              content="The mid-semester examination timetable has been published. Please check your course pages for specific dates and venues."
-              courseName="Introduction to Computer Science"
-              postedBy="Dr. Sarah Kamau"
-              postedAt={today}
-              priority="important"
-            />
+            {announcements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No announcements yet
+              </p>
+            ) : (
+              announcements.map((a: any) => (
+                <AnnouncementCard
+                  key={a._id || a.id}
+                  id={String(a._id || a.id)}
+                  title={a.title}
+                  content={a.message}
+                  courseName={a.courseId?.title || course?.title}
+                  postedBy={a.authorId?.fullName || "Staff"}
+                  postedAt={a.createdAt ? new Date(a.createdAt) : today}
+                  priority={a.isGlobal ? "important" : "normal"}
+                />
+              ))
+            )}
           </div>
         </TabsContent>
       </Tabs>
