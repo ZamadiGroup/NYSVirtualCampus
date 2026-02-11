@@ -160,11 +160,11 @@ PORT=3000 npm run dev
 # PowerShell (recommended for Windows)
 $env:PORT=3000; npm run dev
 
-# Command Prompt (both commands run in the same session)
+# Command Prompt
 set PORT=3000& npm run dev
 ```
 
-> **Note:** In Windows Command Prompt, the `&` operator executes commands sequentially in the same session. Ensure there's no space before `&` to avoid trailing spaces in the variable value.
+> **Note:** In Windows Command Prompt, use `&` to chain commands without spaces before it to avoid trailing spaces in the variable value.
 
 ### Database Connection Issues
 
