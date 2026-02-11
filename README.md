@@ -136,25 +136,33 @@ lsof -ti:5000 | xargs kill -9
 
 **Option 2: Use a different port**
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (recommended for persistent configuration):
 ```bash
 PORT=3000
 ```
 
-Or run the server with a different port using cross-env (works on all platforms):
+Or run the server with a different port:
+
+**Cross-platform (recommended):**
 ```bash
-# Cross-platform (recommended)
 cross-env PORT=3000 npm run dev
-
-# Alternative for Unix-based systems (macOS/Linux)
-PORT=3000 npm run dev
-
-# Alternative for Windows (Command Prompt)
-set PORT=3000 & npm run dev
-
-# Alternative for Windows (PowerShell)
-$env:PORT=3000; npm run dev
 ```
+
+**Unix-based systems (macOS/Linux):**
+```bash
+PORT=3000 npm run dev
+```
+
+**Windows:**
+```powershell
+# PowerShell (recommended for Windows)
+$env:PORT=3000; npm run dev
+
+# Command Prompt (note: may not work as expected, use .env file or PowerShell instead)
+set PORT=3000 & npm run dev
+```
+
+> **Note:** For Windows users, it's recommended to either create a `.env` file or use PowerShell. The cross-env command (already included in the project) provides the most reliable cross-platform experience.
 
 ### Database Connection Issues
 
