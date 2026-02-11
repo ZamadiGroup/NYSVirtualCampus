@@ -79,6 +79,44 @@ NYS Virtual Campus is a professional e-learning platform designed specifically f
 6. **Open your browser**
    Navigate to `http://localhost:5173`
 
+## 🔧 Troubleshooting
+
+### Port Already in Use Error
+
+If you encounter `Error: listen EADDRINUSE: address already in use 0.0.0.0:5000`, this means port 5000 is already being used by another process.
+
+**Solution 1: Stop the process using the port**
+
+- **Windows:**
+  ```bash
+  netstat -ano | findstr :5000
+  taskkill /PID <PID> /F
+  ```
+
+- **Mac/Linux:**
+  ```bash
+  lsof -ti:5000 | xargs kill -9
+  # or
+  npx kill-port 5000
+  ```
+
+**Solution 2: Use a different port**
+
+- **Windows:**
+  ```bash
+  set PORT=3000 && npm run dev
+  ```
+
+- **Mac/Linux:**
+  ```bash
+  PORT=3000 npm run dev
+  ```
+
+- **Or add to your `.env` file:**
+  ```env
+  PORT=3000
+  ```
+
 ## 📱 Demo
 
 The application includes a demo mode where you can switch between different user roles:

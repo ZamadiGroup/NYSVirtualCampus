@@ -157,6 +157,37 @@ If connection fails:
    # Look for connection messages in console
    ```
 
+5. **Port Already in Use (EADDRINUSE Error)**
+   
+   If you see an error like `Error: listen EADDRINUSE: address already in use 0.0.0.0:5000`:
+   
+   - **Option 1**: Kill the process using port 5000
+     - On Windows: 
+       ```bash
+       netstat -ano | findstr :5000
+       taskkill /PID <PID> /F
+       ```
+     - On Mac/Linux:
+       ```bash
+       lsof -ti:5000 | xargs kill -9
+       # or
+       npx kill-port 5000
+       ```
+   
+   - **Option 2**: Use a different port
+     - On Windows: 
+       ```bash
+       set PORT=3000 && npm run dev
+       ```
+     - On Mac/Linux:
+       ```bash
+       PORT=3000 npm run dev
+       ```
+     - Or add to `.env`:
+       ```env
+       PORT=3000
+       ```
+
 ### Production Considerations
 
 For production deployment:

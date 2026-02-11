@@ -78,7 +78,33 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
   server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
+  });
+
+  // Handle server errors, especially EADDRINUSE
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      const errorMessage = [
+        `\n❌ Error: Port ${port} is already in use.`,
+        `\n💡 To fix this issue, try one of the following:\n`,
+        `   1. Find and stop the process using port ${port}:`,
+        `      - On Windows: netstat -ano | findstr :${port}`,
+        `                    taskkill /PID <PID> /F`,
+        `      - On Mac/Linux: lsof -ti:${port} | xargs kill -9`,
+        `                      or: npx kill-port ${port}`,
+        `\n   2. Use a different port by setting the PORT environment variable:`,
+        `      - On Windows: set PORT=3000 && npm run dev`,
+        `      - On Mac/Linux: PORT=3000 npm run dev`,
+        `      - Or add PORT=3000 to your .env file\n`
+      ].join('\n');
+      
+      console.error(errorMessage);
+      process.exit(1);
+    } else {
+      console.error('Server error:', error);
+      process.exit(1);
+    }
   });
 })();
