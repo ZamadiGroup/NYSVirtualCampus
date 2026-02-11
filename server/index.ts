@@ -89,10 +89,10 @@ app.use((req, res, next) => {
       console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.error(`\n🔴 Port ${port} is already being used by another process.\n`);
       console.error('To fix this issue, try one of the following:\n');
-      console.error('1. Stop the process using port ' + port + ':');
-      console.error('   • Windows: Run "netstat -ano | findstr :' + port + '" to find the PID,');
+      console.error(`1. Stop the process using port ${port}:`);
+      console.error(`   • Windows: Run "netstat -ano | findstr :${port}" to find the PID,`);
       console.error('              then "taskkill /PID <PID> /F" to stop it');
-      console.error('   • macOS/Linux: Run "lsof -ti:' + port + ' | xargs kill -9"\n');
+      console.error(`   • macOS/Linux: Run "lsof -ti:${port} | xargs kill -9"\n`);
       console.error('2. Use a different port by setting the PORT environment variable:');
       console.error('   • Create a .env file with: PORT=3000');
       console.error('   • Or run: PORT=3000 npm run dev\n');
