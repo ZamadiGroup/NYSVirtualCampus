@@ -58,17 +58,21 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
+  
+  // Check if we have BOTH the source client files AND built dist
+  // If either is missing, we're in a deployed environment -> use serveStatic
+  const clientSourcePath = path.resolve(import.meta.dirname, "..", "client", "index.html");
   const distPublicPath = path.resolve(import.meta.dirname, "..", "dist", "public");
-  const distPublicExists = fs.existsSync(distPublicPath);
-  const NODE_ENV = process.env.NODE_ENV;
+  const hasClientSource = fs.existsSync(clientSourcePath);
+  const hasDistPublic = fs.existsSync(distPublicPath);
   
-  log(`[Startup] NODE_ENV=${NODE_ENV}, dist/public=${distPublicPath}, exists=${distPublicExists}`);
+  log(`[Startup] hasClientSource=${hasClientSource}, hasDistPublic=${hasDistPublic}`);
   
-  // Use development mode only if explicitly NOT in production and build doesn't exist
-  // On Render/production, always serve static if dist/public exists
-  const isDevelopment = NODE_ENV !== "production" && !distPublicExists;
+  // Only use setupVite if BOTH source files AND build exist (development)
+  // Otherwise always use serveStatic (production)
+  const isDevelopment = hasClientSource && !hasDistPublic;
   
-  log(`[Startup] Using ${isDevelopment ? "DEVELOPMENT" : "PRODUCTION"} mode`);
+  log(`[Startup] Using ${isDevelopment ? "DEVELOPMENT" : "PRODUCTION"} mode (setupVite=${isDevelopment})`);
   
   if (isDevelopment) {
     await setupVite(app, server);
