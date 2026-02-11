@@ -86,17 +86,21 @@ app.use((req, res, next) => {
   // Handle server errors, especially EADDRINUSE
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
-      console.error(`\n❌ Error: Port ${port} is already in use.`);
-      console.error(`\n💡 To fix this issue, try one of the following:\n`);
-      console.error(`   1. Find and stop the process using port ${port}:`);
-      console.error(`      - On Windows: netstat -ano | findstr :${port}`);
-      console.error(`                    taskkill /PID <PID> /F`);
-      console.error(`      - On Mac/Linux: lsof -ti:${port} | xargs kill -9`);
-      console.error(`                      or: npx kill-port ${port}`);
-      console.error(`\n   2. Use a different port by setting the PORT environment variable:`);
-      console.error(`      - On Windows: set PORT=3000 && npm run dev`);
-      console.error(`      - On Mac/Linux: PORT=3000 npm run dev`);
-      console.error(`      - Or add PORT=3000 to your .env file\n`);
+      const errorMessage = [
+        `\n❌ Error: Port ${port} is already in use.`,
+        `\n💡 To fix this issue, try one of the following:\n`,
+        `   1. Find and stop the process using port ${port}:`,
+        `      - On Windows: netstat -ano | findstr :${port}`,
+        `                    taskkill /PID <PID> /F`,
+        `      - On Mac/Linux: lsof -ti:${port} | xargs kill -9`,
+        `                      or: npx kill-port ${port}`,
+        `\n   2. Use a different port by setting the PORT environment variable:`,
+        `      - On Windows: set PORT=3000 && npm run dev`,
+        `      - On Mac/Linux: PORT=3000 npm run dev`,
+        `      - Or add PORT=3000 to your .env file\n`
+      ].join('\n');
+      
+      console.error(errorMessage);
       process.exit(1);
     } else {
       console.error('Server error:', error);
