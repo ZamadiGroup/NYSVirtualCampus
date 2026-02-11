@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm run build
-    startCommand: npm start
+    startCommand: npx tsx server/index.ts
     envVars:
       - key: NODE_ENV
         value: production
