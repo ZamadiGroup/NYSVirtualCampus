@@ -112,6 +112,67 @@ NYSVirtualCampus/
 └── dist/                  # Production build output
 ```
 
+## 🔧 Troubleshooting
+
+### Port Already in Use Error (EADDRINUSE)
+
+If you encounter an error saying "address already in use" on port 5000:
+
+**Option 1: Stop the process using the port**
+
+On Windows:
+```bash
+# Find the process using port 5000
+netstat -ano | findstr :5000
+# Kill the process (replace <PID> with the actual process ID)
+taskkill /PID <PID> /F
+```
+
+On macOS/Linux:
+```bash
+# Find and kill the process using port 5000 (use SIGTERM for graceful shutdown)
+lsof -t -i:5000 | xargs kill
+# If the process doesn't stop, use SIGKILL as a last resort:
+# lsof -t -i:5000 | xargs kill -9
+```
+
+**Option 2: Use a different port**
+
+Create a `.env` file in the project root (recommended for persistent configuration):
+```bash
+PORT=3000
+```
+
+Or run the server with a different port:
+
+**Cross-platform (recommended):**
+```bash
+cross-env PORT=3000 npm run dev
+```
+
+**Unix-based systems (macOS/Linux):**
+```bash
+PORT=3000 npm run dev
+```
+
+**Windows:**
+```cmd
+# PowerShell (recommended for Windows)
+$env:PORT=3000; npm run dev
+
+# Command Prompt
+set PORT=3000& npm run dev
+```
+
+> **Note:** In Windows Command Prompt, use `&` to chain commands without spaces before it to avoid trailing spaces in the variable value.
+
+### Database Connection Issues
+
+If you have trouble connecting to the database:
+1. Check your MongoDB connection string in the `.env` file
+2. Ensure your IP address is whitelisted in MongoDB Atlas
+3. Verify your database credentials are correct
+
 ## 🤝 Contributing
 
 We welcome contributions to improve the NYS Virtual Campus platform. Please follow these guidelines:

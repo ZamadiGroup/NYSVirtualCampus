@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import { connectDB } from "./mongodb";
 
+const ERROR_SEPARATOR = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -78,6 +80,30 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
+  // Set up error handler before calling listen to catch all errors
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error('\n❌ ERROR: Port already in use!');
+      console.error(ERROR_SEPARATOR);
+      console.error(`\n🔴 Port ${port} is already being used by another process.\n`);
+      console.error('To fix this issue, try one of the following:\n');
+      console.error(`1. Stop the process using port ${port}:`);
+      console.error(`   • Windows: Run 'netstat -ano | findstr :${port}' to find the PID,`);
+      console.error(`     then 'taskkill /PID <PID> /F' to stop it`);
+      console.error(`   • macOS/Linux: Run 'lsof -t -i:${port} | xargs kill'`);
+      console.error(`     (use 'kill -9' instead of 'kill' if the process doesn't stop)\n`);
+      console.error('2. Use a different port by setting the PORT environment variable:');
+      console.error('   • Create a .env file with: PORT=3000');
+      console.error('   • Or run: cross-env PORT=3000 npm run dev\n');
+      console.error(ERROR_SEPARATOR);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
+  });
+
   server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
