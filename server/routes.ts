@@ -20,7 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const router = Router();
 
   // JWT Authentication middleware
-  const authenticate: RequestHandler = (req, res, next) => {
+  const authenticate: RequestHandler = async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
       const token = extractTokenFromHeader(authHeader);
@@ -32,6 +32,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decoded = verifyToken(token);
       if (!decoded) {
         return res.status(401).json({ error: "Invalid token" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
+        if (decoded.email) {
+          const user = await User.findOne({ email: decoded.email });
+          if (!user) {
+            return res.status(401).json({ error: "Invalid user" });
+          }
+          decoded.userId = user._id.toString();
+        } else {
+          return res.status(401).json({ error: "Invalid user" });
+        }
       }
 
       (req as AuthenticatedRequest).user = decoded;
@@ -203,16 +215,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
+      // Validate required fields
+      const { username, password, email, fullName, role } = req.body;
+      
+      if (!username || !password || !email || !fullName) {
+        return res.status(400).json({ 
+          error: "Missing required fields: username, password, email, and fullName are required" 
+        });
+      }
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+      if (existingUser) {
+        return res.status(400).json({ 
+          error: existingUser.email === email ? "Email already in use" : "Username already taken" 
+        });
+      }
+
       const payload: any = { ...req.body };
       if (payload.password) {
         payload.password = await bcrypt.hash(payload.password, 10);
       }
+      
       const newUser = new User(payload);
       await newUser.save();
       res.json(newUser);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
-      res.status(500).json({ error: "Failed to create user" });
+      
+      // Parse mongoose validation errors
+      let errorMessage = "Failed to create user";
+      if (error.name === 'ValidationError') {
+        const fields = Object.keys(error.errors);
+        errorMessage = `Validation error: ${fields.join(', ')} are required`;
+      } else if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        errorMessage = `${field} already exists`;
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -271,10 +312,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
+      // Validate required fields
+      const { title, department } = req.body;
+      if (!title || !department) {
+        return res.status(400).json({ 
+          error: "Missing required fields: title and department are required" 
+        });
+      }
+
       // Generate a unique enrollment key
       const enrollmentKey = nanoid(8).toUpperCase();
 
-      const authReq = req as AuthenticatedRequest;
       // Default instructorId to the authenticated user if not provided
       const instructorId = req.body.instructorId || authReq.user.userId;
 
@@ -334,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   const placeholder = new User({
                     username,
-                    password: await bcrypt.hash(nanoid(10), 10), // random hashed password until claimed
+                    password: await bcrypt.hash(nanoid(10), 10),
                     email: em,
                     fullName: 'Invited Student',
                     role: 'student',
@@ -420,7 +468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Allow updating of specific fields
       const updatable = [
-        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive'
+        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 
+        'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive', 'isMandatory', 'instructorId', 
+        'enrollEmails', 'duration'
       ];
 
       updatable.forEach((key) => {
@@ -432,9 +482,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await course.save();
       await course.populate('instructorId', 'fullName');
       res.json(course);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating course:", error);
-      res.status(500).json({ error: "Failed to update course" });
+      let errorMessage = "Failed to update course";
+      if (error.name === 'ValidationError') {
+        const fields = Object.keys(error.errors);
+        errorMessage = `Validation error: ${fields.join(', ')}`;
+      }
+      res.status(500).json({ error: errorMessage });
     }
   });
 

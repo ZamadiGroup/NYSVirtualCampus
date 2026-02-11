@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,22 +22,26 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    department: '',
-    instructorId: '',
-    thumbnail: '',
-    notes: '',
-    estimatedDuration: '',
-    duration: '',
+    title: "",
+    description: "",
+    department: "",
+    instructorId: "",
+    thumbnail: "",
+    notes: "",
+    estimatedDuration: "",
+    duration: "",
     isMandatory: true,
-    tags: '',
+    tags: "",
   });
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+  type FormData = typeof formData;
+  const handleInputChange = <K extends keyof FormData>(
+    field: K,
+    value: FormData[K],
+  ) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -45,24 +49,52 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
     e.preventDefault();
     setIsLoading(true);
 
+    // Validation
+    if (!formData.title?.trim()) {
+      toast({
+        title: "Missing title",
+        description: "Please enter a course title.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.department?.trim()) {
+      toast({
+        title: "Missing department",
+        description: "Please select or enter a department.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Convert tags string to array
-      const tagsArray = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
+      const tagsArray = formData.tags
+        ? formData.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag)
+        : [];
 
       const courseData = {
         ...formData,
         duration: formData.duration ? parseInt(formData.duration) : undefined,
-        isMandatory: formData.isMandatory === true,
+        isMandatory: formData.isMandatory,
         tags: tagsArray,
         // The server will generate the enrollment key automatically
       };
 
       // Ensure user is authenticated before calling API
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       if (!token) {
         toast({
           title: "Not authenticated",
-          description: "You must be logged in as a tutor or admin to add courses.",
+          description:
+            "You must be logged in as a tutor or admin to add courses.",
           variant: "destructive",
         });
         setIsLoading(false);
@@ -75,26 +107,32 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
           ...courseData,
         });
 
+        // Handle both direct response and wrapped response formats
+        const course = newCourse.course || newCourse;
+        const enrollmentKey = course.enrollmentKey || newCourse.enrollmentKey;
+
         toast({
           title: "Course Created Successfully",
-          description: `${formData.title} has been created with enrollment key: ${newCourse.enrollmentKey}`,
+          description: `${formData.title} has been created with enrollment key: ${enrollmentKey}`,
         });
         setIsOpen(false);
         setFormData({
-          title: '',
-          description: '',
-          department: '',
-          instructorId: '',
-          thumbnail: '',
-          notes: '',
-          estimatedDuration: '',
-          duration: '',
+          title: "",
+          description: "",
+          department: "",
+          instructorId: "",
+          thumbnail: "",
+          notes: "",
+          estimatedDuration: "",
+          duration: "",
           isMandatory: true,
-          tags: '',
+          tags: "",
         });
         onCourseAdded?.();
       } catch (err: any) {
-        const message = err?.message || 'Failed to create course';
+        console.error("Course creation error:", err);
+        const message =
+          err?.message || "Failed to create course. Please try again.";
         toast({
           title: "Error Creating Course",
           description: message,
@@ -102,10 +140,11 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
         });
       }
     } catch (error) {
-      console.error('Error creating course:', error);
+      console.error("Error creating course:", error);
       toast({
         title: "Error Creating Course",
-        description: "Network error. Please check your connection and try again.",
+        description:
+          "Network error. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -135,7 +174,7 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="title"
               placeholder="Enter course title"
               value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
+              onChange={(e) => handleInputChange("title", e.target.value)}
               required
             />
           </div>
@@ -146,7 +185,7 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="description"
               placeholder="Enter course description"
               value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+              onChange={(e) => handleInputChange("description", e.target.value)}
               rows={3}
             />
           </div>
@@ -158,7 +197,9 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
                 id="department"
                 placeholder="e.g., Technology"
                 value={formData.department}
-                onChange={(e) => handleInputChange('department', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("department", e.target.value)
+                }
                 required
               />
             </div>
@@ -169,7 +210,9 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
                 id="estimatedDuration"
                 placeholder="e.g., 12 weeks"
                 value={formData.estimatedDuration}
-                onChange={(e) => handleInputChange('estimatedDuration', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("estimatedDuration", e.target.value)
+                }
               />
             </div>
           </div>
@@ -181,18 +224,25 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               type="number"
               placeholder="e.g., 40"
               value={formData.duration}
-              onChange={(e) => handleInputChange('duration', e.target.value)}
+              onChange={(e) => handleInputChange("duration", e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Total hours for this course</p>
+            <p className="text-xs text-muted-foreground">
+              Total hours for this course
+            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="isMandatory" className="flex items-center gap-2 cursor-pointer">
+            <Label
+              htmlFor="isMandatory"
+              className="flex items-center gap-2 cursor-pointer"
+            >
               <input
                 id="isMandatory"
                 type="checkbox"
                 checked={formData.isMandatory}
-                onChange={(e) => handleInputChange('isMandatory', e.target.checked ? 'true' : 'false')}
+                onChange={(e) =>
+                  handleInputChange("isMandatory", e.target.checked)
+                }
               />
               All students must join this course (Mandatory)
             </Label>
@@ -207,10 +257,13 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="instructorId"
               placeholder="Enter instructor user ID (optional)"
               value={formData.instructorId}
-              onChange={(e) => handleInputChange('instructorId', e.target.value)}
+              onChange={(e) =>
+                handleInputChange("instructorId", e.target.value)
+              }
             />
             <p className="text-xs text-muted-foreground">
-              Enter the user ID of the instructor who will teach this course (leave empty to set yourself)
+              Enter the user ID of the instructor who will teach this course
+              (leave empty to set yourself)
             </p>
           </div>
 
@@ -220,7 +273,7 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="thumbnail"
               placeholder="Enter thumbnail image URL"
               value={formData.thumbnail}
-              onChange={(e) => handleInputChange('thumbnail', e.target.value)}
+              onChange={(e) => handleInputChange("thumbnail", e.target.value)}
             />
           </div>
 
@@ -230,7 +283,7 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="notes"
               placeholder="Additional course notes or requirements"
               value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
+              onChange={(e) => handleInputChange("notes", e.target.value)}
               rows={2}
             />
           </div>
@@ -241,7 +294,7 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               id="tags"
               placeholder="Enter tags separated by commas (e.g., programming, beginner, web)"
               value={formData.tags}
-              onChange={(e) => handleInputChange('tags', e.target.value)}
+              onChange={(e) => handleInputChange("tags", e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
               Separate multiple tags with commas
@@ -254,7 +307,8 @@ export function AddCourseDialog({ onCourseAdded }: AddCourseDialogProps) {
               <span className="font-medium">Enrollment Key</span>
             </div>
             <p className="text-xs text-blue-600 mt-1">
-              An enrollment key will be automatically generated for this course. Students will need this key to enroll.
+              An enrollment key will be automatically generated for this course.
+              Students will need this key to enroll.
             </p>
           </div>
 

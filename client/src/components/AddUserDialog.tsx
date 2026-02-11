@@ -27,12 +27,12 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     email: '',
     password: '',
     role: 'student' as 'student' | 'tutor' | 'admin',
     department: '',
-    phoneNumber: '',
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -45,6 +45,47 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    // Validation
+    if (!formData.username?.trim()) {
+      toast({
+        title: "Missing username",
+        description: "Please enter a username for the user.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.fullName?.trim()) {
+      toast({
+        title: "Missing name",
+        description: "Please enter the full name.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.email?.trim()) {
+      toast({
+        title: "Missing email",
+        description: "Please enter an email address.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.password?.trim() || formData.password.length < 6) {
+      toast({
+        title: "Weak password",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       // If an auth token is present, create the user via the admin-protected endpoint.
@@ -70,12 +111,12 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         });
         setIsOpen(false);
         setFormData({
+          username: '',
           fullName: '',
           email: '',
           password: '',
           role: 'student',
           department: '',
-          phoneNumber: '',
         });
         onUserAdded?.();
       } else {
@@ -124,6 +165,18 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
+              <Label htmlFor="username" className="text-sm">Username</Label>
+              <Input
+                id="username"
+                placeholder="Username (unique)"
+                value={formData.username}
+                onChange={(e) => handleInputChange('username', e.target.value)}
+                required
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-1">
               <Label htmlFor="fullName" className="text-sm">Full Name</Label>
               <Input
                 id="fullName"
@@ -134,19 +187,19 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
                 className="h-9"
               />
             </div>
+          </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="email" className="text-sm">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter email address"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                required
-                className="h-9"
-              />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="email" className="text-sm">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter email address"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              required
+              className="h-9"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -178,28 +231,15 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="department" className="text-sm">Department</Label>
-              <Input
-                id="department"
-                placeholder="Enter department"
-                value={formData.department}
-                onChange={(e) => handleInputChange('department', e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="phoneNumber" className="text-sm">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                placeholder="Enter phone number"
-                value={formData.phoneNumber}
-                onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                className="h-9"
-              />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="department" className="text-sm">Department</Label>
+            <Input
+              id="department"
+              placeholder="Enter department (optional)"
+              value={formData.department}
+              onChange={(e) => handleInputChange('department', e.target.value)}
+              className="h-9"
+            />
           </div>
 
           <div className="flex gap-2 justify-end pt-4">
