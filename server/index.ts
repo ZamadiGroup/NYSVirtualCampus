@@ -58,7 +58,17 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  const isDevelopment = process.env.NODE_ENV !== "production" && !fs.existsSync(path.resolve(import.meta.dirname, "..", "dist", "public"));
+  const distPublicPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+  const distPublicExists = fs.existsSync(distPublicPath);
+  const NODE_ENV = process.env.NODE_ENV;
+  
+  log(`[Startup] NODE_ENV=${NODE_ENV}, dist/public=${distPublicPath}, exists=${distPublicExists}`);
+  
+  // Use development mode only if explicitly NOT in production and build doesn't exist
+  // On Render/production, always serve static if dist/public exists
+  const isDevelopment = NODE_ENV !== "production" && !distPublicExists;
+  
+  log(`[Startup] Using ${isDevelopment ? "DEVELOPMENT" : "PRODUCTION"} mode`);
   
   if (isDevelopment) {
     await setupVite(app, server);
