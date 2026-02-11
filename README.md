@@ -141,9 +141,19 @@ Create a `.env` file in the project root:
 PORT=3000
 ```
 
-Or run the server with a different port:
+Or run the server with a different port using cross-env (works on all platforms):
 ```bash
+# Cross-platform (recommended)
+cross-env PORT=3000 npm run dev
+
+# Alternative for Unix-based systems (macOS/Linux)
 PORT=3000 npm run dev
+
+# Alternative for Windows (Command Prompt)
+set PORT=3000 && npm run dev
+
+# Alternative for Windows (PowerShell)
+$env:PORT=3000; npm run dev
 ```
 
 ### Database Connection Issues

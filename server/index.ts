@@ -81,10 +81,7 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   
-  server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
-  });
-
+  // Set up error handler before calling listen to catch all errors
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       console.error('\n❌ ERROR: Port already in use!');
@@ -97,12 +94,16 @@ app.use((req, res, next) => {
       console.error(`   • macOS/Linux: Run "lsof -ti:${port} | xargs kill -9"\n`);
       console.error('2. Use a different port by setting the PORT environment variable:');
       console.error('   • Create a .env file with: PORT=3000');
-      console.error('   • Or run: PORT=3000 npm run dev\n');
+      console.error('   • Or run: cross-env PORT=3000 npm run dev\n');
       console.error(ERROR_SEPARATOR);
       process.exit(1);
     } else {
       console.error('Server error:', err);
       process.exit(1);
     }
+  });
+
+  server.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port}`);
   });
 })();
