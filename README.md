@@ -150,7 +150,7 @@ cross-env PORT=3000 npm run dev
 PORT=3000 npm run dev
 
 # Alternative for Windows (Command Prompt)
-set PORT=3000 && npm run dev
+set PORT=3000 & npm run dev
 
 # Alternative for Windows (PowerShell)
 $env:PORT=3000; npm run dev
