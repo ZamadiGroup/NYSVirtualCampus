@@ -158,11 +158,11 @@ PORT=3000 npm run dev
 # PowerShell (recommended for Windows)
 $env:PORT=3000; npm run dev
 
-# Command Prompt (see note below)
-set PORT=3000 & npm run dev
+# Command Prompt
+set PORT=3000& npm run dev
 ```
 
-> **Note for Windows users:** In Command Prompt, the `set` command may not reliably pass environment variables to `npm run dev` in all cases because the variable is only set for the current command context. For the most reliable experience on Windows, use PowerShell, create a `.env` file, or use the cross-env command.
+> **Note:** In Windows Command Prompt, ensure there's no space before the `&` operator to avoid including trailing spaces in the environment variable value.
 
 ### Database Connection Issues
 
