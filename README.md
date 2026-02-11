@@ -130,8 +130,10 @@ taskkill /PID <PID> /F
 
 On macOS/Linux:
 ```bash
-# Find and kill the process using port 5000
-lsof -t -i:5000 | xargs kill -9
+# Find and kill the process using port 5000 (use SIGTERM for graceful shutdown)
+lsof -t -i:5000 | xargs kill
+# If the process doesn't stop, use SIGKILL as a last resort:
+# lsof -t -i:5000 | xargs kill -9
 ```
 
 **Option 2: Use a different port**
@@ -154,11 +156,11 @@ PORT=3000 npm run dev
 ```
 
 **Windows:**
-```powershell
+```cmd
 # PowerShell (recommended for Windows)
 $env:PORT=3000; npm run dev
 
-# Command Prompt (chains two commands with &)
+# Command Prompt only (note: & chains commands in CMD)
 set PORT=3000& npm run dev
 ```
 
