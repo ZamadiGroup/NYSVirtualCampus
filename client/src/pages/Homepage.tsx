@@ -63,13 +63,13 @@ export default function Homepage({
     return (
       <div className="space-y-6">
         {/* Welcome Hero Section */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded-xl p-8 text-white shadow-lg">
+        <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-400 rounded-xl p-8 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold mb-2">
                 Welcome back, {userName}! 👋
               </h1>
-              <p className="text-blue-100 text-lg">
+              <p className="text-green-100 text-lg">
                 Continue your learning journey with NYS Virtual Campus
               </p>
             </div>
@@ -88,12 +88,12 @@ export default function Homepage({
                       <p className="text-sm text-muted-foreground">
                         Active Courses
                       </p>
-                      <p className="text-3xl font-bold text-blue-600">
+                      <p className="text-3xl font-bold text-green-600">
                         {enrolledCourses.length}
                       </p>
                     </div>
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -152,17 +152,17 @@ export default function Homepage({
           {/* My Courses */}
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-sm h-full">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-green-50 border-b">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-blue-600" />
+                    <BookOpen className="h-5 w-5 text-green-600" />
                     My Courses
                   </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => onNavigate("courses")}
-                    className="text-blue-600 hover:text-blue-700"
+                    className="text-green-600 hover:text-green-700"
                   >
                     View All <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
@@ -184,7 +184,7 @@ export default function Homepage({
                     <p className="text-muted-foreground mb-4">No courses yet</p>
                     <Button
                       onClick={() => onNavigate("courses")}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-green-600 hover:bg-green-700"
                     >
                       Explore Courses
                     </Button>
@@ -194,11 +194,11 @@ export default function Homepage({
                     {enrolledCourses.map((course) => (
                       <div
                         key={course.id}
-                        className="p-4 border rounded-lg hover:bg-blue-50 transition cursor-pointer group"
+                        className="p-4 border rounded-lg hover:bg-green-50 transition cursor-pointer group"
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
+                            <h3 className="font-semibold text-gray-900 group-hover:text-green-600">
                               {course.title}
                             </h3>
                             <p className="text-sm text-gray-500">
@@ -228,19 +228,19 @@ export default function Homepage({
 
           {/* Quick Actions */}
           <Card className="border-0 shadow-sm">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-green-50 border-b">
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+                <TrendingUp className="h-5 w-5 text-green-600" />
                 Quick Actions
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-3">
               <Button
                 variant="outline"
-                className="w-full justify-start hover:bg-blue-50 hover:border-blue-300"
+                className="w-full justify-start hover:bg-green-50 hover:border-green-300"
                 onClick={() => onNavigate("dashboard")}
               >
-                <BarChart3 className="h-4 w-4 mr-2 text-blue-600" />
+                <BarChart3 className="h-4 w-4 mr-2 text-green-600" />
                 My Dashboard
               </Button>
               <Button
@@ -273,9 +273,9 @@ export default function Homepage({
 
         {/* Announcements & Updates */}
         <Card className="border-0 shadow-sm">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-green-50 border-b">
             <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-blue-600" />
+              <Bell className="h-5 w-5 text-green-600" />
               Recent Announcements
             </CardTitle>
           </CardHeader>
@@ -313,9 +313,9 @@ export default function Homepage({
                 </div>
               </div>
 
-              <div className="p-4 border-l-4 border-blue-500 bg-blue-50 rounded">
+              <div className="p-4 border-l-4 border-green-500 bg-green-50 rounded">
                 <div className="flex items-start gap-3">
-                  <Bell className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <Bell className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">
                       Grade Posted
@@ -331,7 +331,7 @@ export default function Homepage({
             </div>
             <Button
               variant="ghost"
-              className="w-full mt-4 text-blue-600 hover:text-blue-700"
+              className="w-full mt-4 text-green-600 hover:text-green-700"
               onClick={() => onNavigate("announcements")}
             >
               View All Announcements <ArrowRight className="h-4 w-4 ml-2" />
@@ -362,7 +362,7 @@ export default function Homepage({
             title: "My Courses",
             icon: GraduationCap,
             page: "courses",
-            color: "bg-blue-500",
+            color: "bg-green-500",
           },
           {
             title: "Students",
@@ -385,7 +385,7 @@ export default function Homepage({
         ];
       case "admin":
         return [
-          { title: "Users", icon: Users, page: "users", color: "bg-blue-500" },
+          { title: "Users", icon: Users, page: "users", color: "bg-green-500" },
           {
             title: "Courses",
             icon: BookOpen,
@@ -461,7 +461,7 @@ export default function Homepage({
             label: "Active Courses",
             value: "6",
             icon: GraduationCap,
-            color: "text-blue-600",
+            color: "text-green-600",
           },
           {
             label: "Total Students",
@@ -488,7 +488,7 @@ export default function Homepage({
             label: "Total Users",
             value: "1,234",
             icon: Users,
-            color: "text-blue-600",
+            color: "text-green-600",
           },
           {
             label: "Active Courses",

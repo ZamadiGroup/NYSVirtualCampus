@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { coursesApi } from "@/lib/api";
+import { coursesApi, assignmentsApi } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
 import { CourseCard } from "@/components/CourseCard";
 import { AssignmentCard } from "@/components/AssignmentCard";
@@ -15,7 +15,9 @@ interface StudentDashboardProps {
   onOpenCourse?: (id: string) => void;
 }
 
-export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps) {
+export default function StudentDashboard({
+  onOpenCourse,
+}: StudentDashboardProps) {
   const { showNotification } = usePlanNotification();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -26,6 +28,7 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
 
   // State for enrolled and available courses
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
 
   const [availableCourses, setAvailableCourses] = useState([
     {
@@ -45,7 +48,7 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
       department: "Social Sciences",
       enrolledCount: 156,
       progress: 0,
-    }
+    },
   ]);
 
   useEffect(() => {
@@ -55,22 +58,26 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
         const res = await coursesApi.getAvailable();
         if (!mounted) return;
         if (Array.isArray(res)) {
-          setAvailableCourses(res.map((c: any) => ({
-            id: c._id || c.id,
-            title: c.title,
-            instructor: c.instructorId?.fullName || 'TBD',
-            thumbnail: c.thumbnail || techThumbnail,
-            department: c.department,
-            enrolledCount: (c.enrolledCount || 0),
-            progress: 0,
-          })));
+          setAvailableCourses(
+            res.map((c: any) => ({
+              id: c._id || c.id,
+              title: c.title,
+              instructor: c.instructorId?.fullName || "TBD",
+              thumbnail: c.thumbnail || techThumbnail,
+              department: c.department,
+              enrolledCount: c.enrolledCount || 0,
+              progress: 0,
+            })),
+          );
         }
       } catch (e) {
-        console.warn('Failed to load available courses', e);
+        console.warn("Failed to load available courses", e);
       }
     };
     fetchAvailable();
-    return () => { mounted = false };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -80,37 +87,78 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
         const res = await coursesApi.getMyEnrollments();
         if (!mounted) return;
         if (Array.isArray(res)) {
-          setEnrolledCourses(res.map((c: any) => ({
-            id: c._id || c.id,
-            title: c.title,
-            instructor: c.instructorId?.fullName || 'TBD',
-            thumbnail: c.thumbnail || techThumbnail,
-            department: c.department,
-            enrolledCount: (c.enrolledCount || 0),
-            progress: 0,
-          })));
+          setEnrolledCourses(
+            res.map((c: any) => ({
+              id: c._id || c.id,
+              title: c.title,
+              instructor: c.instructorId?.fullName || "TBD",
+              thumbnail: c.thumbnail || techThumbnail,
+              department: c.department,
+              enrolledCount: c.enrolledCount || 0,
+              progress: 0,
+            })),
+          );
         }
       } catch (e) {
-        console.warn('Failed to fetch enrolled courses', e);
+        console.warn("Failed to fetch enrolled courses", e);
       }
     };
     fetchEnrolled();
-    return () => { mounted = false };
+    return () => {
+      mounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch assignments for enrolled courses
+  useEffect(() => {
+    let mounted = true;
+    const fetchAssignments = async () => {
+      try {
+        // Backend now filters assignments based on student enrollments
+        const res = await assignmentsApi.getAll();
+        if (!mounted) return;
+        if (Array.isArray(res)) {
+          setAssignments(
+            res.map((a: any) => ({
+              id: String(a._id || a.id),
+              title: a.title,
+              courseName: a.courseId?.title || "Unknown Course",
+              dueDate: a.dueDate ? new Date(a.dueDate) : null,
+              status: "pending", // You can enhance this based on submission status
+              type: a.type,
+            })),
+          );
+        }
+      } catch (e) {
+        console.warn("Failed to fetch assignments", e);
+      }
+    };
+    fetchAssignments();
+    return () => {
+      mounted = false;
+    };
+  }, [enrolledCourses]);
 
   // Function to handle enrollment
   const handleEnroll = (courseId: string) => {
     // Find the course in available courses
-    const courseToEnroll = availableCourses.find(course => course.id === courseId);
-    
+    const courseToEnroll = availableCourses.find(
+      (course) => course.id === courseId,
+    );
+
     if (courseToEnroll) {
       // Add to enrolled courses
-      setEnrolledCourses([...enrolledCourses, {...courseToEnroll, progress: 0}]);
-      
+      setEnrolledCourses([
+        ...enrolledCourses,
+        { ...courseToEnroll, progress: 0 },
+      ]);
+
       // Remove from available courses
-      setAvailableCourses(availableCourses.filter(course => course.id !== courseId));
-      
+      setAvailableCourses(
+        availableCourses.filter((course) => course.id !== courseId),
+      );
+
       // Show success notification
       showNotification({
         title: "Enrolled Successfully",
@@ -140,7 +188,7 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
         />
         <StatCard
           title="Pending Assignments"
-          value={3}
+          value={assignments.length}
           icon={FileText}
           accentColor="chart-2"
         />
@@ -195,11 +243,13 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
             </div>
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">You haven't enrolled in any courses yet.</p>
+              <p className="text-muted-foreground">
+                You haven't enrolled in any courses yet.
+              </p>
             </div>
           )}
         </TabsContent>
-        
+
         <TabsContent value="available" className="space-y-4">
           {availableCourses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -221,43 +271,42 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
             </div>
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No available courses at the moment.</p>
+              <p className="text-muted-foreground">
+                No available courses at the moment.
+              </p>
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="assignments" className="space-y-4">
-          {enrolledCourses.length > 0 ? (
+          {assignments.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <AssignmentCard
-                id="1"
-                title="Database Design Project"
-                courseName="Introduction to Computer Science"
-                dueDate={tomorrow}
-                status="pending"
-                onSubmit={() => console.log("Submit assignment")}
-              />
-              <AssignmentCard
-                id="2"
-                title="Business Case Study Analysis"
-                courseName="Business Management"
-                dueDate={yesterday}
-                status="submitted"
-                onView={() => console.log("View submission")}
-              />
-              <AssignmentCard
-                id="3"
-                title="Structural Analysis Report"
-                courseName="Civil Engineering"
-                dueDate={today}
-                status="graded"
-                grade={85}
-                onView={() => console.log("View submission")}
-              />
+              {assignments.map((assignment) => (
+                <AssignmentCard
+                  key={assignment.id}
+                  id={assignment.id}
+                  title={assignment.title}
+                  courseName={assignment.courseName}
+                  dueDate={assignment.dueDate}
+                  status={assignment.status}
+                  onSubmit={() =>
+                    console.log("Submit assignment", assignment.id)
+                  }
+                  onView={() => console.log("View assignment", assignment.id)}
+                />
+              ))}
+            </div>
+          ) : enrolledCourses.length > 0 ? (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">
+                No assignments yet. Check back later!
+              </p>
             </div>
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No assignments available. Enroll in courses to see assignments.</p>
+              <p className="text-muted-foreground">
+                No assignments available. Enroll in courses to see assignments.
+              </p>
             </div>
           )}
         </TabsContent>
@@ -285,7 +334,10 @@ export default function StudentDashboard({ onOpenCourse }: StudentDashboardProps
             </div>
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No announcements available. Enroll in courses to see announcements.</p>
+              <p className="text-muted-foreground">
+                No announcements available. Enroll in courses to see
+                announcements.
+              </p>
             </div>
           )}
         </TabsContent>

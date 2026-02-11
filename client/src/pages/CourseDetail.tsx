@@ -135,7 +135,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
       case "completed":
         return "from-emerald-50 to-emerald-50 border-emerald-200";
       case "in_progress":
-        return "from-blue-50 to-blue-50 border-blue-200";
+        return "from-green-50 to-green-50 border-green-200";
       case "locked":
         return "from-slate-50 to-slate-50 border-slate-200";
       default:
@@ -153,7 +153,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
         );
       case "in_progress":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
             <BarChart3 size={14} /> In Progress
           </span>
         );
@@ -175,15 +175,15 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
       case "quiz":
         return <BookOpen size={16} className="text-orange-600" />;
       case "reading":
-        return <FileText size={16} className="text-blue-600" />;
+        return <FileText size={16} className="text-green-600" />;
       case "ppt":
-        return <FileText size={16} className="text-blue-600" />;
+        return <FileText size={16} className="text-green-600" />;
       case "file":
-        return <FileText size={16} className="text-blue-600" />;
+        return <FileText size={16} className="text-green-600" />;
       case "assignment":
         return <BarChart3 size={16} className="text-green-600" />;
       default:
-        return <FileText size={16} className="text-blue-600" />;
+        return <FileText size={16} className="text-green-600" />;
     }
   };
 
@@ -587,7 +587,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                       </div>
                       <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
+                          className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500 ease-out"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -596,7 +596,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                     {/* Instructor Info */}
                     <div className="mt-6 pt-6 border-t border-slate-100">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
                           <span className="text-lg font-bold text-white">
                             {(() => {
                               const initials = instructorDisplay
@@ -658,7 +658,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                                 moduleStatus === "completed"
                                   ? "bg-emerald-100 text-emerald-700"
                                   : moduleStatus === "in_progress"
-                                    ? "bg-blue-100 text-blue-700"
+                                    ? "bg-green-100 text-green-700"
                                     : "bg-slate-100 text-slate-600"
                               }`}
                             >

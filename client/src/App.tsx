@@ -23,7 +23,9 @@ import Analytics from "@/pages/Analytics";
 import CourseDetail from "@/pages/CourseDetail";
 import CourseList from "@/pages/CourseList";
 import CreateCourse from "@/pages/CreateCourse";
-import CreateAssignment, { type AssignmentDraft } from "@/pages/CreateAssignment";
+import CreateAssignment, {
+  type AssignmentDraft,
+} from "@/pages/CreateAssignment";
 import AssignmentDetail, { type Assignment } from "@/pages/AssignmentDetail";
 import StudentGrades, { type GradeRecord } from "@/pages/StudentGrades";
 import AdminUploads from "@/pages/AdminUploads";
@@ -31,19 +33,19 @@ import ManageAssignments from "@/pages/ManageAssignments";
 import TutorGrades from "@/pages/TutorGrades";
 import Announcements, { type Announcement } from "@/pages/Announcements";
 import SubmissionsPage from "@/pages/Submissions";
+import SystemSettings from "@/pages/SystemSettings";
 import { useAuth } from "@/lib/useAuth";
 import { assignmentsApi } from "@/lib/api";
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from "@/lib/auth";
 import LoginDialog from "@/components/LoginDialog";
 // TutorAssignments was temporarily added; navigation will render the full TutorDashboard instead.
-
 
 function App() {
   // removed demo role-switcher: derive view from authenticated user or default to 'student'
   const [currentPage, setCurrentPage] = useState<
     | "homepage"
     | "auth"
-    | "dashboard" 
+    | "dashboard"
     | "courses"
     | "course-detail"
     | "assignments"
@@ -65,9 +67,13 @@ function App() {
   // In-memory demo state for assignments, submissions, grades, and admin visibility
   type AssignmentWithDue = Assignment & { dueDate?: string };
   const [assignments, setAssignments] = useState<AssignmentWithDue[]>([]);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<
+    string | null
+  >(null);
   const [grades, setGrades] = useState<GradeRecord[]>([]);
-  const [tutorGrades, setTutorGrades] = useState<(GradeRecord & { studentName: string })[]>([]);
+  const [tutorGrades, setTutorGrades] = useState<
+    (GradeRecord & { studentName: string })[]
+  >([]);
   const [adminItems, setAdminItems] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -83,14 +89,13 @@ function App() {
     admin: "System Administrator",
   };
 
-
   const { user, isAuthenticated, logout, refresh } = useAuth();
   // Normalize role: server may return 'lecturer' or 'tutor' for teaching staff.
   const normalizeRole = (r: string | undefined | null) => {
-    if (!r) return 'student';
-    if (r === 'admin') return 'admin';
-    if (r === 'tutor' || r === 'lecturer') return 'tutor';
-    return 'student';
+    if (!r) return "student";
+    if (r === "admin") return "admin";
+    if (r === "tutor" || r === "lecturer") return "tutor";
+    return "student";
   };
 
   const view = normalizeRole(user?.role as string | undefined);
@@ -112,9 +117,9 @@ function App() {
       setAssignments(Array.isArray(serverAssignments) ? serverAssignments : []);
     } catch (err) {
       // keep existing local assignments on failure
-      console.error('Failed to fetch assignments', err);
-      }
-    };
+      console.error("Failed to fetch assignments", err);
+    }
+  };
 
   React.useEffect(() => {
     fetchAssignments();
@@ -124,15 +129,15 @@ function App() {
   useEffect(() => {
     const applyHash = () => {
       try {
-        const h = window.location.hash.replace(/^#/, '');
-        if (h === 'auth') setCurrentPage('auth');
+        const h = window.location.hash.replace(/^#/, "");
+        if (h === "auth") setCurrentPage("auth");
       } catch (e) {
         // ignore
       }
     };
     applyHash();
-    window.addEventListener('hashchange', applyHash);
-    return () => window.removeEventListener('hashchange', applyHash);
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
   return (
@@ -142,430 +147,592 @@ function App() {
           <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
               {/* Hide sidebar on the auth page for a full-page auth experience */}
-              {currentPage !== 'auth' && (
-                <AppSidebar userRole={view} userName={displayName} onNavigate={handleSidebarNavigation} currentPage={currentPage} />
+              {currentPage !== "auth" && (
+                <AppSidebar
+                  userRole={view}
+                  userName={displayName}
+                  onNavigate={handleSidebarNavigation}
+                  currentPage={currentPage}
+                />
               )}
               <div className="flex flex-col flex-1 overflow-hidden">
                 {/* Hide navigation (sidebar/header) for the full-page auth view */}
-                {currentPage !== 'auth' && <Header />}
+                {currentPage !== "auth" && <Header />}
 
-              <div className="flex-1 overflow-auto bg-background">
-                <div className="container mx-auto p-6 max-w-7xl">
-                  {currentPage === "homepage" && (
-                    <Homepage 
-                      userRole={view} 
-                      userName={displayName} 
-                      onNavigate={handleSidebarNavigation} 
-                    />
-                  )}
+                <div className="flex-1 overflow-auto bg-background">
+                  <div className="container mx-auto p-6 max-w-7xl">
+                    {currentPage === "homepage" && (
+                      <Homepage
+                        userRole={view}
+                        userName={displayName}
+                        onNavigate={handleSidebarNavigation}
+                      />
+                    )}
 
-                  {/* Full-page auth: remove header/sidebar and navigate to correct portal on login */}
-                  {currentPage === 'auth' && (
-                    <Auth onLogin={() => {
-                      // Refresh hook state and immediately read current user to decide routing
-                      try { refresh(); } catch (e) {}
-                      const newUser = getCurrentUser();
-                      const mapped = normalizeRole(newUser?.role);
-                      // Ensure dashboard shows the right portal
-                      setCurrentPage('dashboard');
-                      // reset hash if present
-                      try { window.location.hash = ''; } catch (e) {}
-                      // Optionally you could set other state here based on role
-                    }} />
-                  )}
+                    {/* Full-page auth: remove header/sidebar and navigate to correct portal on login */}
+                    {currentPage === "auth" && (
+                      <Auth
+                        onLogin={() => {
+                          // Refresh hook state and immediately read current user to decide routing
+                          try {
+                            refresh();
+                          } catch (e) {}
+                          const newUser = getCurrentUser();
+                          const mapped = normalizeRole(newUser?.role);
+                          // Ensure dashboard shows the right portal
+                          setCurrentPage("dashboard");
+                          // reset hash if present
+                          try {
+                            window.location.hash = "";
+                          } catch (e) {}
+                          // Optionally you could set other state here based on role
+                        }}
+                      />
+                    )}
 
-                  {currentPage === "dashboard" && (
-                    <>
-                      {view === "student" && <StudentDashboard onOpenCourse={(id: string) => { setSelectedCourseId(id); setCurrentPage('course-detail'); }} />}
-                      {view === "tutor" && (
+                    {currentPage === "dashboard" && (
+                      <>
+                        {view === "student" && (
+                          <StudentDashboard
+                            onOpenCourse={(id: string) => {
+                              setSelectedCourseId(id);
+                              setCurrentPage("course-detail");
+                            }}
+                          />
+                        )}
+                        {view === "tutor" && (
+                          <TutorDashboard
+                            onNavigate={handleSidebarNavigation}
+                            onOpenCourse={(id: string) => {
+                              setSelectedCourseId(id);
+                              setCurrentPage("course-detail");
+                            }}
+                            onOpenAssignment={(id: string) => {
+                              setSelectedAssignmentId(id);
+                              setCurrentPage("assignment-detail");
+                            }}
+                            onAddAssignment={(a: any) =>
+                              setAssignments((prev) => [a, ...prev])
+                            }
+                            onUpdateAssignment={(a: any) =>
+                              setAssignments((prev) =>
+                                prev.map((x) =>
+                                  x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                                ),
+                              )
+                            }
+                            onDeleteAssignment={(id: string) =>
+                              setAssignments((prev) =>
+                                prev.filter((x) => x.id !== id),
+                              )
+                            }
+                            assignmentsFromApp={assignments}
+                            onAssignmentsChange={(a: any[]) =>
+                              setAssignments(a)
+                            }
+                          />
+                        )}
+                        {view === "admin" && <AdminDashboard />}
+                      </>
+                    )}
+
+                    {currentPage === "courses" &&
+                      (view === "tutor" ? (
                         <TutorDashboard
+                          initialTab="courses"
+                          showHeader={false}
+                          hideAssignments={true}
+                          hideStudents={true}
                           onNavigate={handleSidebarNavigation}
-                          onOpenCourse={(id: string) => { setSelectedCourseId(id); setCurrentPage('course-detail'); }}
-                          onOpenAssignment={(id: string) => { setSelectedAssignmentId(id); setCurrentPage('assignment-detail'); }}
-                          onAddAssignment={(a: any) => setAssignments((prev) => [a, ...prev])}
-                          onUpdateAssignment={(a: any) => setAssignments((prev) => prev.map((x) => (x.id === (a.id || a._id) ? { ...x, ...a } : x)))}
-                          onDeleteAssignment={(id: string) => setAssignments((prev) => prev.filter((x) => x.id !== id))}
+                          onOpenCourse={(id: string) => {
+                            setSelectedCourseId(id);
+                            setCurrentPage("course-detail");
+                          }}
+                          onOpenAssignment={(id: string) => {
+                            setSelectedAssignmentId(id);
+                            setCurrentPage("assignment-detail");
+                          }}
+                          onAddAssignment={(a: any) =>
+                            setAssignments((prev) => [a, ...prev])
+                          }
+                          onUpdateAssignment={(a: any) =>
+                            setAssignments((prev) =>
+                              prev.map((x) =>
+                                x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                              ),
+                            )
+                          }
+                          onDeleteAssignment={(id: string) =>
+                            setAssignments((prev) =>
+                              prev.filter(
+                                (x) =>
+                                  (x as any).id !== id && (x as any)._id !== id,
+                              ),
+                            )
+                          }
                           assignmentsFromApp={assignments}
                           onAssignmentsChange={(a: any[]) => setAssignments(a)}
                         />
-                      )}
-                      {view === "admin" && <AdminDashboard />}
-                    </>
-                  )}
-
-                  {currentPage === "courses" && (view === "tutor" ? (
-                    <TutorDashboard
-                      initialTab="courses"
-                      showHeader={false}
-                      hideAssignments={true}
-                      hideStudents={true}
-                      onNavigate={handleSidebarNavigation}
-                      onOpenCourse={(id: string) => { setSelectedCourseId(id); setCurrentPage('course-detail'); }}
-                      onOpenAssignment={(id: string) => { setSelectedAssignmentId(id); setCurrentPage('assignment-detail'); }}
-                      onAddAssignment={(a: any) => setAssignments((prev) => [a, ...prev])}
-                      onUpdateAssignment={(a: any) => setAssignments((prev) => prev.map((x) => (x.id === (a.id || a._id) ? { ...x, ...a } : x)))}
-                      onDeleteAssignment={(id: string) => setAssignments((prev) => prev.filter((x) => ((x as any).id !== id && (x as any)._id !== id)))}
-                      assignmentsFromApp={assignments}
-                      onAssignmentsChange={(a: any[]) => setAssignments(a)}
-                    />
-                  ) : (
-                    <CourseList userRole={view} />
-                  ))}
-                  {currentPage === "course-detail" && <CourseDetail courseId={selectedCourseId || undefined} />}
-                  {(view === "tutor" || view === "admin") && currentPage === "create-course" && (
-                    <CreateCourse
-                      onCancel={() => setCurrentPage("dashboard")}
-                      onCreated={() => {
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-course-${Date.now()}`,
-                            type: "course",
-                            ownerRole: "tutor",
-                            ownerName: "Dr. Sarah Kamau",
-                            description: `Course created`,
-                            createdAt: new Date().toISOString(),
-                          },
-                          ...prev,
-                        ]);
-                        setCurrentPage("dashboard");
-                      }}
-                    />
-                  )}
-                  {view === "tutor" && currentPage === "create-assignment" && (
-                    <CreateAssignment
-                      onCancel={() => setCurrentPage("dashboard")}
-                      onCreated={async (draft: AssignmentDraft) => {
-                        // after creating an assignment, refresh authoritative list from server
-                        try {
-                          await fetchAssignments();
-                        } catch (e) {
-                          // fallback: append a lightweight local representation
-                          const newAssignment: AssignmentWithDue = {
-                            id: `${Date.now()}`,
-                            courseId: draft.courseId,
-                            title: draft.title,
-                            type: draft.type,
-                            instructions: draft.instructions,
-                            questions: draft.questions.map((q) => ({ text: q.text, imageUrl: q.imageUrl, choices: q.choices })),
-                            dueDate: draft.dueDate,
-                          };
-                          setAssignments((prev) => [newAssignment, ...prev]);
-                        }
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-${Date.now()}`,
-                            type: "assignment",
-                            ownerRole: "tutor",
-                            ownerName: "Dr. Sarah Kamau",
-                            description: `Assignment created: ${draft.title}`,
-                            createdAt: new Date().toISOString(),
-                          },
-                          ...prev,
-                        ]);
-                        setCurrentPage("dashboard");
-                      }}
-                    />
-                  )}
-                  {view === "tutor" && currentPage === "manage-assignments" && (
-                    <ManageAssignments
-                      assignments={assignments.map((a) => ({ id: a.id, courseId: a.courseId, title: a.title, dueDate: a.dueDate }))}
-                      onExtendDueDate={(id, newDue) => {
-                        setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, dueDate: newDue } : a)));
-                        const a = assignments.find((x) => x.id === id);
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-deadline-${Date.now()}`,
-                            type: "assignment",
-                            ownerRole: "tutor",
-                            ownerName: "Dr. Sarah Kamau",
-                            description: `Deadline extended: ${a?.title}`,
-                            createdAt: new Date().toISOString(),
-                          },
-                          ...prev,
-                        ]);
-                      }}
-                    />
-                  )}
-                    {(view === "tutor" || view === "admin") && currentPage === "submissions" && (
-                      <SubmissionsPage />
+                      ) : (
+                        <CourseList userRole={view} />
+                      ))}
+                    {currentPage === "course-detail" && (
+                      <CourseDetail courseId={selectedCourseId || undefined} />
                     )}
-                  {view === "tutor" && currentPage === "tutor-grades" && (
-                    <TutorGrades
-                      grades={tutorGrades}
-                      onUpdateManual={(assignmentId, studentName, score) => {
-                        setTutorGrades((prev) => prev.map((g) => (g.assignmentId === assignmentId && g.studentName === studentName ? { ...g, manualScore: score, status: "graded" } : g)));
-                        const a = assignments.find((x) => x.id === assignmentId);
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-grade-${Date.now()}`,
-                            type: "grade",
-                            ownerRole: "tutor",
-                            ownerName: "Dr. Sarah Kamau",
-                            description: `Manual grade updated: ${a?.title} for ${studentName}`,
-                            createdAt: new Date().toISOString(),
-                          },
-                          ...prev,
-                        ]);
-                      }}
-                    />
-                  )}
-                  {currentPage === "announcements" && (
-                    <Announcements
-                      items={announcements}
-                      canPost={view !== "student"}
-                      authorRole={view === "admin" ? "admin" : view === "tutor" ? "tutor" : undefined}
-                      authorName={displayName}
-                      onPost={(a) => {
-                        setAnnouncements((prev) => [a, ...prev]);
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-ann-${Date.now()}`,
-                            type: "announcement",
-                            ownerRole: a.authorRole,
-                            ownerName: a.authorName,
-                            description: `Announcement posted`,
-                            createdAt: a.createdAt,
-                          },
-                          ...prev,
-                        ]);
-                      }}
-                    />
-                  )}
-                  {view === "student" && currentPage === "assignment-detail" && selectedAssignmentId && (
-                    (() => {
-                      const a = assignments.find((x) => x.id === selectedAssignmentId)!;
-                      if (a.dueDate && new Date(a.dueDate).getTime() < Date.now()) {
-                        return (
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Assignment Closed</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              This assignment is no longer available because the deadline has passed.
-                            </CardContent>
-                          </Card>
-                        );
-                      }
-                      return (
-                        <AssignmentDetail
-                      assignment={a}
-                      onSubmit={(submission) => {
-                        // Auto grade if type is auto (simple string match)
-                        const a = assignments.find((x) => x.id === selectedAssignmentId)!;
-                        // Record submission for admin
-                        setAdminItems((prev) => [
-                          {
-                            id: `adm-sub-${Date.now()}`,
-                            type: "submission",
-                            ownerRole: "student",
-                            ownerName: "James Omondi",
-                            description: `Submission for: ${a.title}`,
-                            createdAt: new Date().toISOString(),
-                          },
-                          ...prev,
-                        ]);
-                        if (a.type === "auto") {
-                          // For demo, treat first question's correctAnswer as the answer in questions.choices[0]
-                          // Real correct answers are stored in draft only; here we just mark 1 if non-empty
-                          const score = Object.values(submission.answers || {}).filter((v) => (v as string).trim()).length;
-                          const maxScore = a.questions.length;
-                          setGrades((prev) => [
-                            {
-                              assignmentId: a.id,
-                              assignmentTitle: a.title,
-                              courseId: a.courseId,
-                              score,
-                              maxScore,
-                              status: "graded",
-                            },
-                            ...prev,
-                          ]);
-                          setTutorGrades((prev) => [
-                            {
-                              assignmentId: a.id,
-                              assignmentTitle: a.title,
-                              courseId: a.courseId,
-                              score,
-                              maxScore,
-                              status: "graded",
-                              studentName: "James Omondi",
-                            },
-                            ...prev,
-                          ]);
-                          setAdminItems((prev) => [
-                            {
-                              id: `adm-grade-auto-${Date.now()}`,
-                              type: "grade",
-                              ownerRole: "tutor",
-                              ownerName: "System",
-                              description: `Auto grade computed: ${a.title} for James Omondi`,
-                              createdAt: new Date().toISOString(),
-                            },
-                            ...prev,
-                          ]);
-                        } else {
-                          setGrades((prev) => [
-                            {
-                              assignmentId: a.id,
-                              assignmentTitle: a.title,
-                              courseId: a.courseId,
-                              maxScore: 100,
-                              status: "pending",
-                            },
-                            ...prev,
-                          ]);
-                          setTutorGrades((prev) => [
-                            {
-                              assignmentId: a.id,
-                              assignmentTitle: a.title,
-                              courseId: a.courseId,
-                              maxScore: 100,
-                              status: "pending",
-                              studentName: "James Omondi",
-                            },
-                            ...prev,
-                          ]);
-                        }
-                        setCurrentPage("student-grades");
-                      }}
-                        />
-                      );
-                    })()
-                  )}
-                  {view === "tutor" && currentPage === "assignment-detail" && selectedAssignmentId && (
-                    (() => {
-                      const a = assignments.find((x) => x.id === selectedAssignmentId)!;
-                      if (!a) return null;
-                      return (
-                        <AssignmentDetail
-                          assignment={a}
-                          onSubmit={() => {
-                            // Record that some action happened; tutors won't 'submit' but keep analytics
+                    {(view === "tutor" || view === "admin") &&
+                      currentPage === "create-course" && (
+                        <CreateCourse
+                          onCancel={() => setCurrentPage("dashboard")}
+                          onCreated={() => {
                             setAdminItems((prev) => [
                               {
-                                id: `adm-action-${Date.now()}`,
+                                id: `adm-course-${Date.now()}`,
+                                type: "course",
+                                ownerRole: "tutor",
+                                ownerName: "Dr. Sarah Kamau",
+                                description: `Course created`,
+                                createdAt: new Date().toISOString(),
+                              },
+                              ...prev,
+                            ]);
+                            setCurrentPage("dashboard");
+                          }}
+                        />
+                      )}
+                    {view === "tutor" &&
+                      currentPage === "create-assignment" && (
+                        <CreateAssignment
+                          onCancel={() => setCurrentPage("dashboard")}
+                          onCreated={async (draft: AssignmentDraft) => {
+                            // after creating an assignment, refresh authoritative list from server
+                            try {
+                              await fetchAssignments();
+                            } catch (e) {
+                              // fallback: append a lightweight local representation
+                              const newAssignment: AssignmentWithDue = {
+                                id: `${Date.now()}`,
+                                courseId: draft.courseId,
+                                title: draft.title,
+                                type: draft.type,
+                                instructions: draft.instructions,
+                                questions: draft.questions.map((q) => ({
+                                  text: q.text,
+                                  imageUrl: q.imageUrl,
+                                  choices: q.choices,
+                                })),
+                                dueDate: draft.dueDate,
+                              };
+                              setAssignments((prev) => [
+                                newAssignment,
+                                ...prev,
+                              ]);
+                            }
+                            setAdminItems((prev) => [
+                              {
+                                id: `adm-${Date.now()}`,
                                 type: "assignment",
                                 ownerRole: "tutor",
                                 ownerName: "Dr. Sarah Kamau",
-                                description: `Viewed assignment: ${a.title}`,
+                                description: `Assignment created: ${draft.title}`,
+                                createdAt: new Date().toISOString(),
+                              },
+                              ...prev,
+                            ]);
+                            setCurrentPage("dashboard");
+                          }}
+                        />
+                      )}
+                    {view === "tutor" &&
+                      currentPage === "manage-assignments" && (
+                        <ManageAssignments
+                          assignments={assignments.map((a) => ({
+                            id: a.id,
+                            courseId: a.courseId,
+                            title: a.title,
+                            dueDate: a.dueDate,
+                          }))}
+                          onExtendDueDate={(id, newDue) => {
+                            setAssignments((prev) =>
+                              prev.map((a) =>
+                                a.id === id ? { ...a, dueDate: newDue } : a,
+                              ),
+                            );
+                            const a = assignments.find((x) => x.id === id);
+                            setAdminItems((prev) => [
+                              {
+                                id: `adm-deadline-${Date.now()}`,
+                                type: "assignment",
+                                ownerRole: "tutor",
+                                ownerName: "Dr. Sarah Kamau",
+                                description: `Deadline extended: ${a?.title}`,
                                 createdAt: new Date().toISOString(),
                               },
                               ...prev,
                             ]);
                           }}
                         />
-                      );
-                    })()
-                  )}
-                  {view === "student" && currentPage === "student-grades" && (
-                    <StudentGrades grades={grades} />
-                  )}
-                  {view === "admin" && currentPage === "admin-uploads" && (
-                    <AdminUploads items={adminItems} />
-                  )}
-                  
-                  {/* Student specific pages */}
-                  {view === "student" && currentPage === "assignments" && (
-                    <div className="space-y-6">
-                      <h1 className="text-2xl font-bold">My Assignments</h1>
-                      <p className="text-muted-foreground">View and submit your assignments here.</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {assignments
-                          .filter((a) => !a.dueDate || new Date(a.dueDate).getTime() >= Date.now())
-                          .map((a) => (
-                          <Card key={a.id} className="p-4">
-                            <div className="space-y-2">
-                              <h3 className="font-semibold">{a.title}</h3>
-                              <p className="text-sm text-muted-foreground">Course: {a.courseId} • Type: {a.type}</p>
-                              <Button onClick={() => { setSelectedAssignmentId(a.id); setCurrentPage("assignment-detail"); }}>
-                                Open
-                              </Button>
-                            </div>
-                          </Card>
-                        ))}
+                      )}
+                    {(view === "tutor" || view === "admin") &&
+                      currentPage === "submissions" && <SubmissionsPage />}
+                    {view === "tutor" && currentPage === "tutor-grades" && (
+                      <TutorGrades
+                        grades={tutorGrades}
+                        onUpdateManual={(assignmentId, studentName, score) => {
+                          setTutorGrades((prev) =>
+                            prev.map((g) =>
+                              g.assignmentId === assignmentId &&
+                              g.studentName === studentName
+                                ? { ...g, manualScore: score, status: "graded" }
+                                : g,
+                            ),
+                          );
+                          const a = assignments.find(
+                            (x) => x.id === assignmentId,
+                          );
+                          setAdminItems((prev) => [
+                            {
+                              id: `adm-grade-${Date.now()}`,
+                              type: "grade",
+                              ownerRole: "tutor",
+                              ownerName: "Dr. Sarah Kamau",
+                              description: `Manual grade updated: ${a?.title} for ${studentName}`,
+                              createdAt: new Date().toISOString(),
+                            },
+                            ...prev,
+                          ]);
+                        }}
+                      />
+                    )}
+                    {currentPage === "announcements" && (
+                      <Announcements
+                        items={announcements}
+                        canPost={view !== "student"}
+                        authorRole={
+                          view === "admin"
+                            ? "admin"
+                            : view === "tutor"
+                              ? "tutor"
+                              : undefined
+                        }
+                        authorName={displayName}
+                        onPost={(a) => {
+                          setAnnouncements((prev) => [a, ...prev]);
+                          setAdminItems((prev) => [
+                            {
+                              id: `adm-ann-${Date.now()}`,
+                              type: "announcement",
+                              ownerRole: a.authorRole,
+                              ownerName: a.authorName,
+                              description: `Announcement posted`,
+                              createdAt: a.createdAt,
+                            },
+                            ...prev,
+                          ]);
+                        }}
+                      />
+                    )}
+                    {view === "student" &&
+                      currentPage === "assignment-detail" &&
+                      selectedAssignmentId &&
+                      (() => {
+                        const a = assignments.find(
+                          (x) => x.id === selectedAssignmentId,
+                        )!;
+                        if (
+                          a.dueDate &&
+                          new Date(a.dueDate).getTime() < Date.now()
+                        ) {
+                          return (
+                            <Card>
+                              <CardHeader>
+                                <CardTitle>Assignment Closed</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                This assignment is no longer available because
+                                the deadline has passed.
+                              </CardContent>
+                            </Card>
+                          );
+                        }
+                        return (
+                          <AssignmentDetail
+                            assignment={a}
+                            onSubmit={(submission) => {
+                              // Auto grade if type is auto (simple string match)
+                              const a = assignments.find(
+                                (x) => x.id === selectedAssignmentId,
+                              )!;
+                              // Record submission for admin
+                              setAdminItems((prev) => [
+                                {
+                                  id: `adm-sub-${Date.now()}`,
+                                  type: "submission",
+                                  ownerRole: "student",
+                                  ownerName: "James Omondi",
+                                  description: `Submission for: ${a.title}`,
+                                  createdAt: new Date().toISOString(),
+                                },
+                                ...prev,
+                              ]);
+                              if (a.type === "auto") {
+                                // For demo, treat first question's correctAnswer as the answer in questions.choices[0]
+                                // Real correct answers are stored in draft only; here we just mark 1 if non-empty
+                                const score = Object.values(
+                                  submission.answers || {},
+                                ).filter((v) => (v as string).trim()).length;
+                                const maxScore = a.questions.length;
+                                setGrades((prev) => [
+                                  {
+                                    assignmentId: a.id,
+                                    assignmentTitle: a.title,
+                                    courseId: a.courseId,
+                                    score,
+                                    maxScore,
+                                    status: "graded",
+                                  },
+                                  ...prev,
+                                ]);
+                                setTutorGrades((prev) => [
+                                  {
+                                    assignmentId: a.id,
+                                    assignmentTitle: a.title,
+                                    courseId: a.courseId,
+                                    score,
+                                    maxScore,
+                                    status: "graded",
+                                    studentName: "James Omondi",
+                                  },
+                                  ...prev,
+                                ]);
+                                setAdminItems((prev) => [
+                                  {
+                                    id: `adm-grade-auto-${Date.now()}`,
+                                    type: "grade",
+                                    ownerRole: "tutor",
+                                    ownerName: "System",
+                                    description: `Auto grade computed: ${a.title} for James Omondi`,
+                                    createdAt: new Date().toISOString(),
+                                  },
+                                  ...prev,
+                                ]);
+                              } else {
+                                setGrades((prev) => [
+                                  {
+                                    assignmentId: a.id,
+                                    assignmentTitle: a.title,
+                                    courseId: a.courseId,
+                                    maxScore: 100,
+                                    status: "pending",
+                                  },
+                                  ...prev,
+                                ]);
+                                setTutorGrades((prev) => [
+                                  {
+                                    assignmentId: a.id,
+                                    assignmentTitle: a.title,
+                                    courseId: a.courseId,
+                                    maxScore: 100,
+                                    status: "pending",
+                                    studentName: "James Omondi",
+                                  },
+                                  ...prev,
+                                ]);
+                              }
+                              setCurrentPage("student-grades");
+                            }}
+                          />
+                        );
+                      })()}
+                    {view === "tutor" &&
+                      currentPage === "assignment-detail" &&
+                      selectedAssignmentId &&
+                      (() => {
+                        const a = assignments.find(
+                          (x) => x.id === selectedAssignmentId,
+                        )!;
+                        if (!a) return null;
+                        return (
+                          <AssignmentDetail
+                            assignment={a}
+                            onSubmit={() => {
+                              // Record that some action happened; tutors won't 'submit' but keep analytics
+                              setAdminItems((prev) => [
+                                {
+                                  id: `adm-action-${Date.now()}`,
+                                  type: "assignment",
+                                  ownerRole: "tutor",
+                                  ownerName: "Dr. Sarah Kamau",
+                                  description: `Viewed assignment: ${a.title}`,
+                                  createdAt: new Date().toISOString(),
+                                },
+                                ...prev,
+                              ]);
+                            }}
+                          />
+                        );
+                      })()}
+                    {view === "student" && currentPage === "student-grades" && (
+                      <StudentGrades grades={grades} />
+                    )}
+                    {view === "admin" && currentPage === "admin-uploads" && (
+                      <AdminUploads items={adminItems} />
+                    )}
+
+                    {/* Student specific pages */}
+                    {view === "student" && currentPage === "assignments" && (
+                      <div className="space-y-6">
+                        <h1 className="text-2xl font-bold">My Assignments</h1>
+                        <p className="text-muted-foreground">
+                          View and submit your assignments here.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {assignments
+                            .filter(
+                              (a) =>
+                                !a.dueDate ||
+                                new Date(a.dueDate).getTime() >= Date.now(),
+                            )
+                            .map((a) => (
+                              <Card key={a.id} className="p-4">
+                                <div className="space-y-2">
+                                  <h3 className="font-semibold">{a.title}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Course: {a.courseId} • Type: {a.type}
+                                  </p>
+                                  <Button
+                                    onClick={() => {
+                                      setSelectedAssignmentId(a.id);
+                                      setCurrentPage("assignment-detail");
+                                    }}
+                                  >
+                                    Open
+                                  </Button>
+                                </div>
+                              </Card>
+                            ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {view === "student" && currentPage === "announcements" && (
-                    <div className="space-y-6">
-                      <h1 className="text-2xl font-bold">Announcements</h1>
-                      <p className="text-muted-foreground">Stay updated with the latest announcements.</p>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Tutor specific pages */}
-                  {view === "tutor" && currentPage === "assignments" && (
-                    <TutorDashboard
-                      initialTab="assignments"
-                      showHeader={false}
-                      hideCourses={true}
-                      hideStudents={true}
-                      hideContent={true}
-                      hideAnnouncements={true}
-                      onNavigate={handleSidebarNavigation}
-                      onOpenCourse={(id: string) => { setSelectedCourseId(id); setCurrentPage('course-detail'); }}
-                      onOpenAssignment={(id: string) => { setSelectedAssignmentId(id); setCurrentPage('assignment-detail'); }}
-                      onAddAssignment={(a: any) => setAssignments((prev) => [a, ...prev])}
-                      onUpdateAssignment={(a: any) => setAssignments((prev) => prev.map((x) => (x.id === (a.id || a._id) ? { ...x, ...a } : x)))}
-                      onDeleteAssignment={(id: string) => setAssignments((prev) => prev.filter((x) => ((x as any).id !== id && (x as any)._id !== id)))}
-                      assignmentsFromApp={assignments}
-                      onAssignmentsChange={(a: any[]) => setAssignments(a)}
-                    />
-                  )}
-                  
-                  {view === "tutor" && currentPage === "students" && (
-                    <TutorDashboard
-                      initialTab="students"
-                      showHeader={false}
-                      hideCourses={true}
-                      hideAssignments={true}
-                      hideContent={true}
-                      hideAnnouncements={true}
-                      onNavigate={handleSidebarNavigation}
-                      onOpenCourse={(id: string) => { setSelectedCourseId(id); setCurrentPage('course-detail'); }}
-                      onOpenAssignment={(id: string) => { setSelectedAssignmentId(id); setCurrentPage('assignment-detail'); }}
-                      onAddAssignment={(a: any) => setAssignments((prev) => [a, ...prev])}
-                      onUpdateAssignment={(a: any) => setAssignments((prev) => prev.map((x) => (x.id === (a.id || a._id) ? { ...x, ...a } : x)))}
-                      onDeleteAssignment={(id: string) => setAssignments((prev) => prev.filter((x) => ((x as any).id !== id && (x as any)._id !== id)))}
-                      assignmentsFromApp={assignments}
-                      onAssignmentsChange={(a: any[]) => setAssignments(a)}
-                    />
-                  )}
-                  
-                  {view === "tutor" && currentPage === "analytics" && (
-                    <div className="space-y-6">
-                      <h1 className="text-2xl font-bold">Analytics</h1>
-                      <p className="text-muted-foreground">View performance analytics and insights.</p>
-                    </div>
-                  )}
+                    {view === "student" && currentPage === "announcements" && (
+                      <div className="space-y-6">
+                        <h1 className="text-2xl font-bold">Announcements</h1>
+                        <p className="text-muted-foreground">
+                          Stay updated with the latest announcements.
+                        </p>
+                      </div>
+                    )}
 
-                  {/* Admin specific pages */}
-                  {view === "admin" && currentPage === "users" && (
-                    <Users />
-                  )}
-                  
-                  {view === "admin" && currentPage === "analytics" && (
-                    <Analytics />
-                  )}
-                  
-                  {view === "admin" && currentPage === "settings" && (
-                    <div className="space-y-6">
-                      <h1 className="text-2xl font-bold">System Settings</h1>
-                      <p className="text-muted-foreground">Configure system settings and preferences.</p>
-                    </div>
-                  )}
+                    {/* Tutor specific pages */}
+                    {view === "tutor" && currentPage === "assignments" && (
+                      <TutorDashboard
+                        initialTab="assignments"
+                        showHeader={false}
+                        hideCourses={true}
+                        hideStudents={true}
+                        hideContent={true}
+                        hideAnnouncements={true}
+                        onNavigate={handleSidebarNavigation}
+                        onOpenCourse={(id: string) => {
+                          setSelectedCourseId(id);
+                          setCurrentPage("course-detail");
+                        }}
+                        onOpenAssignment={(id: string) => {
+                          setSelectedAssignmentId(id);
+                          setCurrentPage("assignment-detail");
+                        }}
+                        onAddAssignment={(a: any) =>
+                          setAssignments((prev) => [a, ...prev])
+                        }
+                        onUpdateAssignment={(a: any) =>
+                          setAssignments((prev) =>
+                            prev.map((x) =>
+                              x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                            ),
+                          )
+                        }
+                        onDeleteAssignment={(id: string) =>
+                          setAssignments((prev) =>
+                            prev.filter(
+                              (x) =>
+                                (x as any).id !== id && (x as any)._id !== id,
+                            ),
+                          )
+                        }
+                        assignmentsFromApp={assignments}
+                        onAssignmentsChange={(a: any[]) => setAssignments(a)}
+                      />
+                    )}
+
+                    {view === "tutor" && currentPage === "students" && (
+                      <TutorDashboard
+                        initialTab="students"
+                        showHeader={false}
+                        hideCourses={true}
+                        hideAssignments={true}
+                        hideContent={true}
+                        hideAnnouncements={true}
+                        onNavigate={handleSidebarNavigation}
+                        onOpenCourse={(id: string) => {
+                          setSelectedCourseId(id);
+                          setCurrentPage("course-detail");
+                        }}
+                        onOpenAssignment={(id: string) => {
+                          setSelectedAssignmentId(id);
+                          setCurrentPage("assignment-detail");
+                        }}
+                        onAddAssignment={(a: any) =>
+                          setAssignments((prev) => [a, ...prev])
+                        }
+                        onUpdateAssignment={(a: any) =>
+                          setAssignments((prev) =>
+                            prev.map((x) =>
+                              x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                            ),
+                          )
+                        }
+                        onDeleteAssignment={(id: string) =>
+                          setAssignments((prev) =>
+                            prev.filter(
+                              (x) =>
+                                (x as any).id !== id && (x as any)._id !== id,
+                            ),
+                          )
+                        }
+                        assignmentsFromApp={assignments}
+                        onAssignmentsChange={(a: any[]) => setAssignments(a)}
+                      />
+                    )}
+
+                    {view === "tutor" && currentPage === "analytics" && (
+                      <div className="space-y-6">
+                        <h1 className="text-2xl font-bold">Analytics</h1>
+                        <p className="text-muted-foreground">
+                          View performance analytics and insights.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Admin specific pages */}
+                    {view === "admin" && currentPage === "users" && <Users />}
+
+                    {view === "admin" && currentPage === "analytics" && (
+                      <Analytics />
+                    )}
+
+                    {view === "admin" && currentPage === "settings" && (
+                      <SystemSettings />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <Toaster />
-        </SidebarProvider>
-      </PlanNotificationProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+            <Toaster />
+          </SidebarProvider>
+        </PlanNotificationProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
-
 
 export default App;

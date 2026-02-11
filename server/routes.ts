@@ -20,7 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const router = Router();
 
   // JWT Authentication middleware
-  const authenticate: RequestHandler = (req, res, next) => {
+  const authenticate: RequestHandler = async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
       const token = extractTokenFromHeader(authHeader);
@@ -32,6 +32,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decoded = verifyToken(token);
       if (!decoded) {
         return res.status(401).json({ error: "Invalid token" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
+        if (decoded.email) {
+          const user = await User.findOne({ email: decoded.email });
+          if (!user) {
+            return res.status(401).json({ error: "Invalid user" });
+          }
+          decoded.userId = user._id.toString();
+        } else {
+          return res.status(401).json({ error: "Invalid user" });
+        }
       }
 
       (req as AuthenticatedRequest).user = decoded;
@@ -203,16 +215,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
-      const payload: any = { ...req.body };
+      // Validate required fields
+      let { username, password, email, fullName, role } = req.body;
+      
+      if (!password || !email || !fullName) {
+        return res.status(400).json({ 
+          error: "Missing required fields: password, email, and fullName are required" 
+        });
+      }
+
+      // Auto-generate username from email if not provided
+      if (!username) {
+        username = email.split('@')[0];
+      }
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+      if (existingUser) {
+        return res.status(400).json({ 
+          error: existingUser.email === email ? "Email already in use" : "Username already taken" 
+        });
+      }
+
+      const payload: any = { ...req.body, username };
       if (payload.password) {
         payload.password = await bcrypt.hash(payload.password, 10);
       }
+      
       const newUser = new User(payload);
       await newUser.save();
       res.json(newUser);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
-      res.status(500).json({ error: "Failed to create user" });
+      
+      // Parse mongoose validation errors
+      let errorMessage = "Failed to create user";
+      if (error.name === 'ValidationError') {
+        const fields = Object.keys(error.errors);
+        errorMessage = `Validation error: ${fields.join(', ')} are required`;
+      } else if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        errorMessage = `${field} already exists`;
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -271,12 +317,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/courses", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
+      // Validate required fields
+      const { title, department } = req.body;
+      if (!title || !department) {
+        return res.status(400).json({ 
+          error: "Missing required fields: title and department are required" 
+        });
+      }
+
       // Generate a unique enrollment key
       const enrollmentKey = nanoid(8).toUpperCase();
 
-      const authReq = req as AuthenticatedRequest;
       // Default instructorId to the authenticated user if not provided
-      const instructorId = req.body.instructorId || authReq.user.userId;
+      // Validate that instructorId is a valid MongoDB ObjectId if provided
+      let instructorId = authReq.user.userId;
+      if (req.body.instructorId && req.body.instructorId.trim()) {
+        const providedId = req.body.instructorId.trim();
+        if (!mongoose.Types.ObjectId.isValid(providedId)) {
+          return res.status(400).json({ 
+            error: "Invalid instructorId: must be a valid MongoDB ObjectId" 
+          });
+        }
+        instructorId = providedId;
+      }
 
       // Persist enrollEmails if provided
       const coursePayload: any = {
@@ -288,6 +351,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (Array.isArray(req.body.enrollEmails)) {
         coursePayload.enrollEmails = req.body.enrollEmails.filter((e: any) => typeof e === 'string' && e.includes('@'));
       }
+
+      // Create the course first
+      const newCourse = new Course(coursePayload);
+      await newCourse.save();
+      await newCourse.populate('instructorId', 'fullName');
 
       // If course is mandatory, auto-enroll all existing students
       const enrollResults: { processed: string[]; skipped: string[]; notFound: string[] } = { processed: [], skipped: [], notFound: [] };
@@ -329,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   const placeholder = new User({
                     username,
-                    password: await bcrypt.hash(nanoid(10), 10), // random hashed password until claimed
+                    password: await bcrypt.hash(nanoid(10), 10),
                     email: em,
                     fullName: 'Invited Student',
                     role: 'student',
@@ -373,9 +441,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ course: newCourse, enrollments: enrollResults });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating course:", error);
-      res.status(500).json({ error: "Failed to create course" });
+      // Provide more specific error message for debugging
+      const errorMessage = error?.message || "Failed to create course";
+      const errorDetails = error?.errors 
+        ? Object.values(error.errors).map((e: any) => e.message).join(', ')
+        : undefined;
+      res.status(500).json({ 
+        error: errorDetails || errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      });
     }
   });
 
@@ -415,7 +491,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Allow updating of specific fields
       const updatable = [
-        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive'
+        'title', 'description', 'department', 'notes', 'pptLinks', 'resources', 'attachments', 'tags', 
+        'estimatedDuration', 'outline', 'chapters', 'thumbnail', 'isActive', 'isMandatory', 'instructorId', 
+        'enrollEmails', 'duration'
       ];
 
       updatable.forEach((key) => {
@@ -427,9 +505,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await course.save();
       await course.populate('instructorId', 'fullName');
       res.json(course);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating course:", error);
-      res.status(500).json({ error: "Failed to update course" });
+      let errorMessage = "Failed to update course";
+      if (error.name === 'ValidationError') {
+        const fields = Object.keys(error.errors);
+        errorMessage = `Validation error: ${fields.join(', ')}`;
+      }
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -663,6 +746,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query = { ...query, courseId: courseId as string } as any;
       }
       
+      // If user is a student, only return assignments for courses they're enrolled in
+      if (authReq.user.role === 'student') {
+        const enrollments = await Enrollment.find({ studentId: authReq.user.userId }).select('courseId');
+        const enrolledCourseIds = enrollments.map((e) => e.courseId);
+        query = { ...query, courseId: { $in: enrolledCourseIds } } as any;
+      }
+      
       const allAssignments = await Assignment.find(query).populate('courseId', 'title');
       res.json(allAssignments);
     } catch (error) {
@@ -734,17 +824,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: graduate a student (set isGraduated flag)
+  // Admin: graduate a student (set isGraduated flag and remove from all courses)
   router.post('/users/:id/graduate', authenticate, requireRole(['admin']), async (req, res) => {
     try {
       const user = await User.findById(req.params.id);
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      if (user.role !== 'student') return res.status(400).json({ error: 'Only students can be graduated' });
-      user.isGraduated = true;
-      await user.save();
-      res.json({ success: true, user });
-    } catch (err) {
-      console.error('Error graduating student', err);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (user.role !== 'student') {
+        return res.status(400).json({ error: 'Only students can be graduated' });
+      }
+      
+      // Remove student from all courses by deleting their enrollments
+      const deletedEnrollments = await Enrollment.deleteMany({ studentId: req.params.id });
+      console.log(`Graduated student ${user.fullName}: removed from ${deletedEnrollments.deletedCount} courses`);
+      
+      // Mark student as graduated
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        { isGraduated: true },
+        { new: true }
+      );
+      
+      res.json({ 
+        success: true, 
+        user: updatedUser,
+        removedFromCourses: deletedEnrollments.deletedCount 
+      });
+    } catch (err: any) {
+      console.error('Error graduating student:', err?.message || err);
       res.status(500).json({ error: 'Failed to graduate student' });
     }
   });
@@ -765,8 +873,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // initial match on submission-level fields
       const match: any = {};
-      if (assignmentId) match.assignmentId = mongoose.Types.ObjectId(assignmentId);
-      if (studentId) match.studentId = mongoose.Types.ObjectId(studentId);
+      if (assignmentId) match.assignmentId = new mongoose.Types.ObjectId(assignmentId);
+      if (studentId) match.studentId = new mongoose.Types.ObjectId(studentId);
       if (Object.keys(match).length) pipeline.push({ $match: match });
 
       // lookup assignment
@@ -792,12 +900,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // filter by courseId if provided
       if (courseId) {
-        pipeline.push({ $match: { 'assignment.courseId': mongoose.Types.ObjectId(courseId) } });
+        pipeline.push({ $match: { 'assignment.courseId': new mongoose.Types.ObjectId(courseId) } });
       }
 
       // Enforce tutor access: only submissions for courses they instruct
       if (authReq.user.role === 'tutor') {
-        pipeline.push({ $match: { 'course.instructorId': mongoose.Types.ObjectId(authReq.user.userId) } });
+        pipeline.push({ $match: { 'course.instructorId': new mongoose.Types.ObjectId(authReq.user.userId) } });
       }
 
       // filter by status if requested
@@ -1010,6 +1118,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error('Failed to delete announcement', err);
       res.status(500).json({ error: 'Failed to delete announcement' });
+    }
+  });
+
+  // Get all enrollments (for tutors/admins to see which students are in which courses)
+  router.get("/enrollments", authenticate, requireRole(["tutor", "admin"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      // If tutor, only return enrollments for courses they instruct
+      if (authReq.user.role === 'tutor') {
+        const tutorCourses = await Course.find({ instructorId: authReq.user.userId }).select('_id');
+        const tutorCourseIds = tutorCourses.map(c => c._id);
+        const enrollments = await Enrollment.find({ courseId: { $in: tutorCourseIds } })
+          .populate('studentId', 'name email username')
+          .populate('courseId', 'title');
+        return res.json(enrollments);
+      }
+      // Admin can see all enrollments
+      const enrollments = await Enrollment.find()
+        .populate('studentId', 'name email username')
+        .populate('courseId', 'title');
+      res.json(enrollments);
+    } catch (err) {
+      console.error('Failed to fetch enrollments', err);
+      res.status(500).json({ error: 'Failed to fetch enrollments' });
     }
   });
 

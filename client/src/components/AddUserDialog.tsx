@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,18 +27,18 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    role: 'student' as 'student' | 'tutor' | 'admin',
-    department: '',
-    phoneNumber: '',
+    username: "",
+    fullName: "",
+    email: "",
+    password: "",
+    role: "student" as "student" | "tutor" | "admin",
+    department: "",
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -46,21 +46,58 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
     e.preventDefault();
     setIsLoading(true);
 
+    // Validation - username is optional (auto-generated from email if empty)
+    if (!formData.fullName?.trim()) {
+      toast({
+        title: "Missing name",
+        description: "Please enter the full name.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.email?.trim()) {
+      toast({
+        title: "Missing email",
+        description: "Please enter an email address.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.password?.trim() || formData.password.length < 6) {
+      toast({
+        title: "Weak password",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // Auto-generate username from email if not provided
+    const dataToSubmit = {
+      ...formData,
+      username: formData.username?.trim() || formData.email.split("@")[0],
+    };
+
     try {
       // If an auth token is present, create the user via the admin-protected endpoint.
       // Otherwise fall back to the public register endpoint.
-      const token = localStorage.getItem('token');
-      const url = token ? '/api/users' : '/api/auth/register';
+      const token = localStorage.getItem("token");
+      const url = token ? "/api/users" : "/api/auth/register";
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSubmit),
       });
 
       if (response.ok) {
@@ -70,12 +107,12 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         });
         setIsOpen(false);
         setFormData({
-          fullName: '',
-          email: '',
-          password: '',
-          role: 'student',
-          department: '',
-          phoneNumber: '',
+          username: "",
+          fullName: "",
+          email: "",
+          password: "",
+          role: "student",
+          department: "",
         });
         onUserAdded?.();
       } else {
@@ -95,10 +132,11 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         });
       }
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
       toast({
         title: "Error Creating User",
-        description: "Network error. Please check your connection and try again.",
+        description:
+          "Network error. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -124,48 +162,75 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="fullName" className="text-sm">Full Name</Label>
+              <Label htmlFor="username" className="text-sm">
+                Username{" "}
+                <span className="text-muted-foreground text-xs">
+                  (optional)
+                </span>
+              </Label>
               <Input
-                id="fullName"
-                placeholder="Enter full name"
-                value={formData.fullName}
-                onChange={(e) => handleInputChange('fullName', e.target.value)}
-                required
+                id="username"
+                placeholder="Auto-generated from email"
+                value={formData.username}
+                onChange={(e) => handleInputChange("username", e.target.value)}
                 className="h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="email" className="text-sm">Email</Label>
+              <Label htmlFor="fullName" className="text-sm">
+                Full Name
+              </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="Enter email address"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
+                id="fullName"
+                placeholder="Enter full name"
+                value={formData.fullName}
+                onChange={(e) => handleInputChange("fullName", e.target.value)}
                 required
                 className="h-9"
               />
             </div>
           </div>
 
+          <div className="space-y-1">
+            <Label htmlFor="email" className="text-sm">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter email address"
+              value={formData.email}
+              onChange={(e) => handleInputChange("email", e.target.value)}
+              required
+              className="h-9"
+            />
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="password" className="text-sm">Password</Label>
+              <Label htmlFor="password" className="text-sm">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter password"
                 value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
+                onChange={(e) => handleInputChange("password", e.target.value)}
                 required
                 className="h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="role" className="text-sm">Role</Label>
-              <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+              <Label htmlFor="role" className="text-sm">
+                Role
+              </Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => handleInputChange("role", value)}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -178,28 +243,17 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="department" className="text-sm">Department</Label>
-              <Input
-                id="department"
-                placeholder="Enter department"
-                value={formData.department}
-                onChange={(e) => handleInputChange('department', e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="phoneNumber" className="text-sm">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                placeholder="Enter phone number"
-                value={formData.phoneNumber}
-                onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                className="h-9"
-              />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="department" className="text-sm">
+              Department
+            </Label>
+            <Input
+              id="department"
+              placeholder="Enter department (optional)"
+              value={formData.department}
+              onChange={(e) => handleInputChange("department", e.target.value)}
+              className="h-9"
+            />
           </div>
 
           <div className="flex gap-2 justify-end pt-4">
