@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import { connectDB } from "./mongodb";
 
+const ERROR_SEPARATOR = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -86,7 +88,7 @@ app.use((req, res, next) => {
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       console.error('\n❌ ERROR: Port already in use!');
-      console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.error(ERROR_SEPARATOR);
       console.error(`\n🔴 Port ${port} is already being used by another process.\n`);
       console.error('To fix this issue, try one of the following:\n');
       console.error(`1. Stop the process using port ${port}:`);
@@ -96,7 +98,7 @@ app.use((req, res, next) => {
       console.error('2. Use a different port by setting the PORT environment variable:');
       console.error('   • Create a .env file with: PORT=3000');
       console.error('   • Or run: PORT=3000 npm run dev\n');
-      console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.error(ERROR_SEPARATOR);
       process.exit(1);
     } else {
       console.error('Server error:', err);
