@@ -112,6 +112,47 @@ NYSVirtualCampus/
 └── dist/                  # Production build output
 ```
 
+## 🔧 Troubleshooting
+
+### Port Already in Use Error (EADDRINUSE)
+
+If you encounter an error saying "address already in use" on port 5000:
+
+**Option 1: Stop the process using the port**
+
+On Windows:
+```bash
+# Find the process using port 5000
+netstat -ano | findstr :5000
+# Kill the process (replace <PID> with the actual process ID)
+taskkill /PID <PID> /F
+```
+
+On macOS/Linux:
+```bash
+# Find and kill the process using port 5000
+lsof -ti:5000 | xargs kill -9
+```
+
+**Option 2: Use a different port**
+
+Create a `.env` file in the project root:
+```bash
+PORT=3000
+```
+
+Or run the server with a different port:
+```bash
+PORT=3000 npm run dev
+```
+
+### Database Connection Issues
+
+If you have trouble connecting to the database:
+1. Check your MongoDB connection string in the `.env` file
+2. Ensure your IP address is whitelisted in MongoDB Atlas
+3. Verify your database credentials are correct
+
 ## 🤝 Contributing
 
 We welcome contributions to improve the NYS Virtual Campus platform. Please follow these guidelines:
