@@ -131,7 +131,7 @@ taskkill /PID <PID> /F
 On macOS/Linux:
 ```bash
 # Find and kill the process using port 5000
-lsof -ti:5000 | xargs kill -9
+lsof -t -i:5000 | xargs kill -9
 ```
 
 **Option 2: Use a different port**

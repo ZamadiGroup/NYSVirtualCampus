@@ -91,7 +91,7 @@ app.use((req, res, next) => {
       console.error(`1. Stop the process using port ${port}:`);
       console.error(`   • Windows: Run 'netstat -ano | findstr :${port}' to find the PID,`);
       console.error(`     then 'taskkill /PID <PID> /F' to stop it`);
-      console.error(`   • macOS/Linux: Run 'lsof -ti:${port} | xargs kill -9'\n`);
+      console.error(`   • macOS/Linux: Run 'lsof -t -i:${port} | xargs kill -9'\n`);
       console.error('2. Use a different port by setting the PORT environment variable:');
       console.error('   • Create a .env file with: PORT=3000');
       console.error('   • Or run: cross-env PORT=3000 npm run dev\n');
