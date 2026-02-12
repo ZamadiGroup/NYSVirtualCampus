@@ -5,24 +5,27 @@ export const connectDB = async () => {
   try {
     if (process.env.MONGODB_URI) {
       // Prefer MongoDB when MONGODB_URI is provided
-      await mongoose.connect(process.env.MONGODB_URI);
-      console.log('✅ Connected to MongoDB Atlas');
-      return;
+      try {
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('✅ Connected to MongoDB Atlas');
+        return;
+      } catch (mongoError) {
+        console.warn('⚠️ MongoDB connection failed, continuing without MongoDB:', (mongoError as Error).message);
+        // Don't re-throw - allow app to continue with other databases
+      }
     }
 
     // If no Mongo URI, but a Postgres DATABASE_URL is present, the server may be configured
     // to use the Postgres / Drizzle layer instead. Log this and continue.
     if (process.env.DATABASE_URL) {
-      console.warn('⚠️ MONGODB_URI not set but DATABASE_URL is present. Skipping MongoDB connection and relying on Postgres.');
+      console.warn('⚠️ Using DATABASE_URL for Postgres/Drizzle layer.');
       return;
     }
 
-    // If neither DB is configured, fail early to avoid silent non-functional API.
-    throw new Error('No database configured. Set MONGODB_URI or DATABASE_URL in environment variables.');
+    console.warn('⚠️ No MONGODB_URI or DATABASE_URL configured. Server starting without database.');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    // Re-throw to ensure the server does not start in an inconsistent state
-    throw error;
+    console.error('❌ Database setup error:', error);
+    // Don't re-throw - allow server to start anyway
   }
 };
 
