@@ -11,7 +11,7 @@
 
     "build": "rm -rf dist && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist/server",
 
-    "start": "cross-env NODE_ENV=production node dist/server/index.js",
+    "start": "node dist/server/index.js",
 
     "check": "tsc",
 

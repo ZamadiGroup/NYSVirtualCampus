@@ -1,108 +1,108 @@
-import express, { type Express } from "express";
-import fs from "fs";
+import "dotenv/config";
+import express, { type Request, type Response, type NextFunction } from "express";
+import cors from "cors";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-import { type Server } from "http";
-import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
+import fs from "fs";
 
-const viteLogger = createLogger();
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import { connectDB } from "./mongodb";
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
+process.on("unhandledRejection", (reason) => {
+  console.error("❌ Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err);
+});
+
+const app = express();
+
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+// API logging middleware (TypeScript-safe)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  const reqPath = req.path;
+
+  let capturedJsonResponse: any = undefined;
+
+  const originalResJson = res.json.bind(res) as Response["json"];
+
+  res.json = ((body: any) => {
+    capturedJsonResponse = body;
+    return originalResJson(body);
+  }) as Response["json"];
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+
+      if (capturedJsonResponse !== undefined) {
+        try {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        } catch {
+          logLine += ` :: [unserializable json]`;
+        }
+      }
+
+      if (logLine.length > 140) logLine = logLine.slice(0, 139) + "…";
+      log(logLine);
+    }
   });
 
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
+  next();
+});
 
-export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
-  };
+(async () => {
+  try {
+    log(`[Startup] cwd=${process.cwd()}`);
+    log(`[Startup] NODE_ENV=${process.env.NODE_ENV || "undefined"}`);
+    log(`[Startup] PORT=${process.env.PORT || "undefined"}`);
 
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
+    // DB connect (never throws now)
+    await connectDB();
 
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
+    const server = await registerRoutes(app);
 
+    // uploads (mount before SPA fallback)
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
-
-      // always reload the index.html file from disk incase it changes
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
+      const uploadsDir = path.resolve(process.cwd(), "attached_assets", "uploads");
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      app.use("/uploads", express.static(uploadsDir));
+      log(`[Startup] uploads mounted at /uploads -> ${uploadsDir}`);
+    } catch (err) {
+      log(`[Startup] Failed to setup uploads static dir: ${err}`);
     }
-  });
-}
 
-export function serveStatic(app: Express) {
-  const publicPath = path.resolve(process.cwd(), "dist", "public");
-  const indexPath = path.join(publicPath, "index.html");
+    // Error handler (do NOT throw)
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err?.status || err?.statusCode || 500;
+      const message = err?.message || "Internal Server Error";
+      log(`[Error] ${status} ${message}`);
+      res.status(status).json({ message });
+    });
 
-  log(`[serveStatic] Checking for build at: ${publicPath}`);
+    // Dev vs Prod by NODE_ENV only
+    const nodeEnv = (process.env.NODE_ENV || "production").toLowerCase();
+    const isDevelopment = nodeEnv === "development";
 
-  if (!fs.existsSync(publicPath)) {
-    const errorMsg = `Build directory not found: ${publicPath}\n` +
-      `Please run "npm run build" before starting in production.`;
-    log(`[serveStatic] ERROR: ${errorMsg}`);
-    throw new Error(errorMsg);
+    if (isDevelopment) {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    const port = parseInt(process.env.PORT || "5000", 10);
+    server.listen(port, "0.0.0.0", () => {
+      log(`✅ serving on port ${port}`);
+    });
+  } catch (err) {
+    console.error("❌ FATAL startup error:", err);
+    process.exit(1);
   }
-
-  if (!fs.existsSync(indexPath)) {
-    const errorMsg = `index.html not found in: ${indexPath}\n` +
-      `Your build may be incomplete. Please run "npm run build" again.`;
-    log(`[serveStatic] ERROR: ${errorMsg}`);
-    throw new Error(errorMsg);
-  }
-
-  log(`[serveStatic] Serving static files from: ${publicPath}`);
-  app.use(express.static(publicPath));
-
-  // SPA fallback: serve index.html for all unmatched routes
-  // This ensures client-side routing works correctly
-  app.get("*", (_req, res, next) => {
-    // Don't intercept API routes
-    if (_req.path.startsWith("/api") || _req.path.startsWith("/uploads")) {
-      return next();
-    }
-
-    try {
-      res.sendFile(indexPath);
-    } catch (error) {
-      log(`[serveStatic] Error serving index.html: ${error}`);
-      res.status(500).send("Application error");
-    }
-  });
-}
+})();
