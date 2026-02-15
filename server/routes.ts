@@ -12,7 +12,7 @@ import {
   type AuthenticatedRequest,
   type JWTPayload 
 } from "./jwt";
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { nanoid } from "nanoid";
 import fs from 'fs';
 
