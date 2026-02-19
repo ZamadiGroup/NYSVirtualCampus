@@ -1,9 +1,13 @@
 #!/bin/bash
 
-# Build the client
-npm run vercel-build
+# Build frontend
+cd frontend
+npm run build
+cd ..
 
-# Build the server
-esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist/server
+# Build backend
+cd backend
+npm run build
+cd ..
 
 echo "Build completed successfully!"

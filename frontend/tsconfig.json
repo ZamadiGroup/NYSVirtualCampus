@@ -1,5 +1,5 @@
 {
-  "include": ["frontend/client/src/**/*", "frontend/shared/**/*", "backend/server/**/*"],
+  "include": ["client/src/**/*", "shared/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
@@ -16,9 +16,9 @@
     "baseUrl": ".",
     "types": ["node", "vite/client", "vitest/globals"],
     "paths": {
-      "@/*": ["./frontend/client/src/*"],
-      "@shared/*": ["./frontend/shared/*"],
-      "@assets/*": ["./frontend/attached_assets/*"]
+      "@/*": ["./client/src/*"],
+      "@shared/*": ["./shared/*"],
+      "@assets/*": ["./attached_assets/*"]
     }
   }
 }

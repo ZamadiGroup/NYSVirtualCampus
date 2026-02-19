@@ -1,9 +1,13 @@
 @echo off
 
-REM Build the client
-npm run vercel-build
+REM Build frontend
+cd frontend
+call npm run build
+cd ..
 
-REM Build the server
-esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist/server
+REM Build backend
+cd backend
+call npm run build
+cd ..
 
 echo Build completed successfully!

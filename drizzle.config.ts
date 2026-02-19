@@ -1,14 +1,8 @@
-import { defineConfig } from "drizzle-kit";
+// This file is kept for backward compatibility
+// The actual drizzle config is now in backend/drizzle.config.ts
+// To manage database, use commands from backend folder:
+// cd backend && npm run db:push
+// cd backend && npm run db:generate
+// cd backend && npm run db:migrate
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
-
-export default defineConfig({
-  out: "./migrations",
-  schema: "./shared/schema.ts",
-  dialect: "postgresql",
-  dbCredentials: {
-    url: process.env.DATABASE_URL,
-  },
-});
+export {};

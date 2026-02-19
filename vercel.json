@@ -2,22 +2,29 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.mjs",
+      "src": "backend/api/index.mjs",
       "use": "@vercel/node"
     },
     {
-      "src": "package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist/public"
+        "distDir": "frontend/dist"
       }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.mjs"
+      "dest": "/backend/api/index.mjs"
     },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
+
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"

@@ -1,5 +1,5 @@
 {
-  "include": ["frontend/client/src/**/*", "frontend/shared/**/*", "backend/server/**/*"],
+  "include": ["server/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
@@ -7,18 +7,15 @@
     "noEmit": true,
     "module": "ESNext",
     "strict": true,
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "jsx": "preserve",
+    "lib": ["esnext"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "baseUrl": ".",
-    "types": ["node", "vite/client", "vitest/globals"],
+    "types": ["node"],
     "paths": {
-      "@/*": ["./frontend/client/src/*"],
-      "@shared/*": ["./frontend/shared/*"],
-      "@assets/*": ["./frontend/attached_assets/*"]
+      "@shared/*": ["../frontend/shared/*"]
     }
   }
 }
