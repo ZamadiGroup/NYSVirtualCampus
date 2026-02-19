@@ -41,23 +41,19 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
+
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
+      const clientTemplate = path.resolve(process.cwd(), "client", "index.html");
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${nanoid()}"`
       );
+
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -68,34 +64,23 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // For Vercel deployment, static files are served from the root dist directory
-  const distPath = path.resolve(import.meta.dirname, "..", "dist");
-  const publicPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+  // ✅ MUST match your Vite outDir: dist/public
+  const publicPath = path.resolve(process.cwd(), "dist", "public");
+  const indexPath = path.join(publicPath, "index.html");
 
-  // Check both possible locations for static files
-  const staticPath = fs.existsSync(publicPath) ? publicPath : distPath;
+  log(`[serveStatic] Serving static from: ${publicPath}`);
 
-  if (!fs.existsSync(staticPath)) {
-    throw new Error(
-      `Could not find the build directory: ${staticPath}, make sure to build the client first`,
-    );
+  if (!fs.existsSync(publicPath)) {
+    throw new Error(`Build directory not found: ${publicPath}`);
+  }
+  if (!fs.existsSync(indexPath)) {
+    throw new Error(`index.html not found: ${indexPath}`);
   }
 
-  app.use(express.static(staticPath));
+  app.use(express.static(publicPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    try {
-      const indexPath = path.resolve(staticPath, "index.html");
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        console.error(`Index file not found at: ${indexPath}`);
-        res.status(404).send("Application not found. Please check the build output.");
-      }
-    } catch (error) {
-      console.error("Error serving static files:", error);
-      res.status(500).send("Internal server error");
-    }
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) return next();
+    res.sendFile(indexPath);
   });
 }

@@ -35,7 +35,20 @@ export default defineConfig({
         // Don't externalize any dependencies for client build
         return false;
       },
+      output: {
+        // Split large chunks to improve performance
+        manualChunks: {
+          // Separate vendor libraries into their own chunk
+          'vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+          ],
+        },
+      },
     },
+    // Reduce chunk warnings
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     fs: {
