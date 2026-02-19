@@ -13,10 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Homepage from "@/pages/Homepage";
+import LandingPage from "@/pages/LandingPage";
 import Auth from "@/pages/Auth";
 import StudentDashboard from "@/pages/StudentDashboard";
 import TutorDashboard from "@/pages/TutorDashboard";
 import TutorAssignments from "@/components/TutorAssignments";
+import { AssignmentCard } from "@/components/AssignmentCard";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Users from "@/pages/Users";
 import Analytics from "@/pages/Analytics";
@@ -43,6 +45,7 @@ import LoginDialog from "@/components/LoginDialog";
 function App() {
   // removed demo role-switcher: derive view from authenticated user or default to 'student'
   const [currentPage, setCurrentPage] = useState<
+    | "landing"
     | "homepage"
     | "auth"
     | "dashboard"
@@ -62,7 +65,7 @@ function App() {
     | "admin-uploads"
     | "manage-assignments"
     | "tutor-grades"
-  >("homepage");
+  >("landing");
 
   // In-memory demo state for assignments, submissions, grades, and admin visibility
   type AssignmentWithDue = Assignment & { dueDate?: string };
@@ -144,20 +147,100 @@ function App() {
     fetchAnnouncements();
   }, []);
 
-  // Sync hash-based navigation for simple full-page auth routing (e.g. #auth)
+  // Browser history integration - sync URL with app state
   useEffect(() => {
-    const applyHash = () => {
+    const parseUrl = () => {
       try {
-        const h = window.location.hash.replace(/^#/, "");
-        if (h === "auth") setCurrentPage("auth");
+        const hash = window.location.hash.replace(/^#/, "");
+        if (!hash) {
+          // Default to landing page if not authenticated, homepage if authenticated
+          setCurrentPage(isAuthenticated ? "homepage" : "landing");
+          return;
+        }
+
+        const [page, ...params] = hash.split("/");
+
+        // Protected pages require authentication
+        const protectedPages = [
+          "homepage",
+          "dashboard",
+          "courses",
+          "course-detail",
+          "assignments",
+          "assignment-detail",
+          "announcements",
+          "students",
+          "submissions",
+          "analytics",
+          "users",
+          "settings",
+          "create-course",
+          "create-assignment",
+          "student-grades",
+          "admin-uploads",
+          "manage-assignments",
+          "tutor-grades",
+        ];
+
+        if (protectedPages.includes(page) && !isAuthenticated) {
+          console.log("User not authenticated, redirecting to landing");
+          setCurrentPage("landing");
+          window.history.replaceState(null, "", "#landing");
+          return;
+        }
+
+        setCurrentPage(page as any);
+
+        // Parse query params for IDs
+        if (params.length > 0) {
+          const query = params.join("/");
+          if (query.includes("course=")) {
+            const courseId = query.match(/course=([^&]+)/)?.[1];
+            if (courseId) setSelectedCourseId(courseId);
+          }
+          if (query.includes("assignment=")) {
+            const assignmentId = query.match(/assignment=([^&]+)/)?.[1];
+            if (assignmentId) setSelectedAssignmentId(assignmentId);
+          }
+        }
       } catch (e) {
-        // ignore
+        console.error("Error parsing URL:", e);
       }
     };
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, []);
+
+    // Parse URL on mount
+    parseUrl();
+
+    // Listen to browser back/forward
+    window.addEventListener("popstate", parseUrl);
+    return () => window.removeEventListener("popstate", parseUrl);
+  }, [isAuthenticated]);
+
+  // Update URL when page changes
+  useEffect(() => {
+    let hash = `#${currentPage}`;
+
+    // Add IDs to URL
+    const params: string[] = [];
+    if (
+      selectedCourseId &&
+      (currentPage === "course-detail" || currentPage === "assignment-detail")
+    ) {
+      params.push(`course=${selectedCourseId}`);
+    }
+    if (selectedAssignmentId && currentPage === "assignment-detail") {
+      params.push(`assignment=${selectedAssignmentId}`);
+    }
+
+    if (params.length > 0) {
+      hash += `/${params.join("&")}`;
+    }
+
+    // Update URL without triggering hashchange
+    if (window.location.hash !== hash) {
+      window.history.pushState(null, "", hash);
+    }
+  }, [currentPage, selectedCourseId, selectedAssignmentId]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -165,8 +248,8 @@ function App() {
         <PlanNotificationProvider>
           <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
-              {/* Hide sidebar on the auth page for a full-page auth experience */}
-              {currentPage !== "auth" && (
+              {/* Hide sidebar on the auth and landing pages for a full-page experience */}
+              {currentPage !== "auth" && currentPage !== "landing" && (
                 <AppSidebar
                   userRole={view}
                   userName={displayName}
@@ -175,11 +258,23 @@ function App() {
                 />
               )}
               <div className="flex flex-col flex-1 overflow-hidden">
-                {/* Hide navigation (sidebar/header) for the full-page auth view */}
-                {currentPage !== "auth" && <Header />}
+                {/* Hide navigation for landing and auth pages */}
+                {currentPage !== "auth" && currentPage !== "landing" && (
+                  <Header />
+                )}
 
                 <div className="flex-1 overflow-auto bg-background">
-                  <div className="container mx-auto p-6 max-w-7xl">
+                  <div
+                    className={
+                      currentPage === "landing"
+                        ? "w-full"
+                        : "container mx-auto p-6 max-w-7xl"
+                    }
+                  >
+                    {currentPage === "landing" && (
+                      <LandingPage onNavigate={handleSidebarNavigation} />
+                    )}
+
                     {currentPage === "homepage" && (
                       <Homepage
                         userRole={view}
@@ -216,6 +311,10 @@ function App() {
                             onOpenCourse={(id: string) => {
                               setSelectedCourseId(id);
                               setCurrentPage("course-detail");
+                            }}
+                            onOpenAssignment={(id: string) => {
+                              setSelectedAssignmentId(id);
+                              setCurrentPage("assignment-detail");
                             }}
                           />
                         )}
@@ -302,7 +401,13 @@ function App() {
                         />
                       ))}
                     {currentPage === "course-detail" && (
-                      <CourseDetail courseId={selectedCourseId || undefined} />
+                      <CourseDetail
+                        courseId={selectedCourseId || undefined}
+                        onOpenAssignment={(id: string) => {
+                          setSelectedAssignmentId(id);
+                          setCurrentPage("assignment-detail");
+                        }}
+                      />
                     )}
                     {(view === "tutor" || view === "admin") &&
                       currentPage === "create-course" && (
@@ -462,7 +567,19 @@ function App() {
                       (() => {
                         const a = assignments.find(
                           (x) => x.id === selectedAssignmentId,
-                        )!;
+                        );
+                        if (!a) {
+                          return (
+                            <Card>
+                              <CardHeader>
+                                <CardTitle>Assignment Not Found</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                The selected assignment could not be found.
+                              </CardContent>
+                            </Card>
+                          );
+                        }
                         if (
                           a.dueDate &&
                           new Date(a.dueDate).getTime() < Date.now()
@@ -610,40 +727,58 @@ function App() {
                         <p className="text-muted-foreground">
                           View and submit your assignments here.
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {assignments
-                            .filter(
-                              (a) =>
-                                !a.dueDate ||
-                                new Date(a.dueDate).getTime() >= Date.now(),
-                            )
-                            .map((a) => {
+                        {assignments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No assignments yet.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {assignments.map((a) => {
                               const courseLabel =
                                 typeof (a as any).courseId === "object"
                                   ? (a as any).courseId?.title ||
-                                    (a as any).courseId?._id ||
                                     "Unknown Course"
                                   : (a as any).courseId || "Unknown Course";
+
+                              // Determine status based on due date and submission
+                              let status:
+                                | "pending"
+                                | "submitted"
+                                | "graded"
+                                | "overdue" = (a as any).status || "pending";
+
+                              if (
+                                status === "pending" &&
+                                a.dueDate &&
+                                new Date(a.dueDate).getTime() < Date.now()
+                              ) {
+                                status = "overdue";
+                              }
+
                               return (
-                                <Card key={a.id} className="p-4">
-                                  <div className="space-y-2">
-                                    <h3 className="font-semibold">{a.title}</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                      Course: {courseLabel} • Type: {a.type}
-                                    </p>
-                                    <Button
-                                      onClick={() => {
-                                        setSelectedAssignmentId(a.id);
-                                        setCurrentPage("assignment-detail");
-                                      }}
-                                    >
-                                      Open
-                                    </Button>
-                                  </div>
-                                </Card>
+                                <AssignmentCard
+                                  key={a.id}
+                                  id={a.id}
+                                  title={a.title}
+                                  courseName={courseLabel}
+                                  dueDate={
+                                    a.dueDate ? new Date(a.dueDate) : new Date()
+                                  }
+                                  status={status}
+                                  grade={(a as any).grade}
+                                  onSubmit={() => {
+                                    setSelectedAssignmentId(a.id);
+                                    setCurrentPage("assignment-detail");
+                                  }}
+                                  onView={() => {
+                                    setSelectedAssignmentId(a.id);
+                                    setCurrentPage("assignment-detail");
+                                  }}
+                                />
                               );
                             })}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

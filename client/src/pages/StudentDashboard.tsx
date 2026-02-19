@@ -13,10 +13,12 @@ import { usePlanNotification } from "@/components/PlanNotification";
 
 interface StudentDashboardProps {
   onOpenCourse?: (id: string) => void;
+  onOpenAssignment?: (id: string) => void;
 }
 
 export default function StudentDashboard({
   onOpenCourse,
+  onOpenAssignment,
 }: StudentDashboardProps) {
   const { showNotification } = usePlanNotification();
   const tomorrow = new Date();
@@ -308,10 +310,8 @@ export default function StudentDashboard({
                   courseName={assignment.courseName}
                   dueDate={assignment.dueDate}
                   status={assignment.status}
-                  onSubmit={() =>
-                    console.log("Submit assignment", assignment.id)
-                  }
-                  onView={() => console.log("View assignment", assignment.id)}
+                  onSubmit={() => onOpenAssignment?.(assignment.id)}
+                  onView={() => onOpenAssignment?.(assignment.id)}
                 />
               ))}
             </div>

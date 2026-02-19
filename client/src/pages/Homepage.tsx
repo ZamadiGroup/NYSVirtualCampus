@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   BookOpen,
   Users,
@@ -20,7 +19,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { coursesApi } from "@/lib/api";
+import { coursesApi, assignmentsApi, submissionsApi } from "@/lib/api";
+import { parseJwt } from "@/lib/auth";
 
 interface HomepageProps {
   userRole: "student" | "tutor" | "admin";
@@ -35,6 +35,8 @@ export default function Homepage({
 }: HomepageProps) {
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingAssignments, setPendingAssignments] = useState(0);
+  const [overallProgress, setOverallProgress] = useState(0);
 
   useEffect(() => {
     if (userRole !== "student") return;
@@ -44,7 +46,61 @@ export default function Homepage({
         const res = await coursesApi.getMyEnrollments();
         if (!mounted) return;
         if (Array.isArray(res)) {
-          setEnrolledCourses(res.slice(0, 3)); // Show only 3 courses
+          const courses = res.slice(0, 3); // Show only 3 courses
+          setEnrolledCourses(courses);
+
+          // Calculate overall progress (average of all enrolled courses)
+          if (res.length > 0) {
+            const avgProgress =
+              res.reduce((sum: number, c: any) => sum + (c.progress || 0), 0) /
+              res.length;
+            setOverallProgress(Math.round(avgProgress));
+          }
+
+          // Fetch all assignments for enrolled courses and calculate pending
+          const token = localStorage.getItem("token");
+          if (token) {
+            const decoded = parseJwt(token);
+            const userId = decoded?.userId;
+
+            if (userId && res.length > 0) {
+              // Get all assignments for all enrolled courses
+              const allAssignments: any[] = [];
+              for (const course of res) {
+                try {
+                  const courseAssignments = await assignmentsApi.getAll(
+                    String((course as any)._id || course.id),
+                  );
+                  if (Array.isArray(courseAssignments)) {
+                    allAssignments.push(...courseAssignments);
+                  }
+                } catch (e) {
+                  console.warn("Failed to fetch assignments for course", e);
+                }
+              }
+
+              // Get all submissions for this student
+              try {
+                const submissions = await submissionsApi.getAll({
+                  studentId: userId,
+                });
+                const submittedAssignmentIds = new Set(
+                  Array.isArray(submissions)
+                    ? submissions.map((s: any) => s.assignmentId)
+                    : [],
+                );
+
+                // Count pending assignments (not submitted yet)
+                const pending = allAssignments.filter(
+                  (a: any) => !submittedAssignmentIds.has(a.id || a._id),
+                ).length;
+
+                setPendingAssignments(pending);
+              } catch (e) {
+                console.warn("Failed to fetch submissions", e);
+              }
+            }
+          }
         }
       } catch (e) {
         console.warn("Failed to load courses", e);
@@ -106,7 +162,9 @@ export default function Homepage({
                       <p className="text-sm text-muted-foreground">
                         Pending Assignments
                       </p>
-                      <p className="text-3xl font-bold text-orange-600">3</p>
+                      <p className="text-3xl font-bold text-orange-600">
+                        {pendingAssignments}
+                      </p>
                     </div>
                     <div className="p-3 bg-orange-50 rounded-lg">
                       <FileText className="h-6 w-6 text-orange-600" />
@@ -122,7 +180,9 @@ export default function Homepage({
                       <p className="text-sm text-muted-foreground">
                         Overall Progress
                       </p>
-                      <p className="text-3xl font-bold text-green-600">65%</p>
+                      <p className="text-3xl font-bold text-green-600">
+                        {overallProgress}%
+                      </p>
                     </div>
                     <div className="p-3 bg-green-50 rounded-lg">
                       <TrendingUp className="h-6 w-6 text-green-600" />
@@ -136,12 +196,23 @@ export default function Homepage({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">
-                        Study Hours
+                        Total Materials
                       </p>
-                      <p className="text-3xl font-bold text-purple-600">24h</p>
+                      <p className="text-3xl font-bold text-purple-600">
+                        {enrolledCourses.reduce(
+                          (sum, c) =>
+                            sum +
+                            (c.chapters?.reduce(
+                              (chSum: number, ch: any) =>
+                                chSum + (ch.materials?.length || 0),
+                              0,
+                            ) || 0),
+                          0,
+                        )}
+                      </p>
                     </div>
                     <div className="p-3 bg-purple-50 rounded-lg">
-                      <Clock className="h-6 w-6 text-purple-600" />
+                      <FileText className="h-6 w-6 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -196,7 +267,7 @@ export default function Homepage({
                         key={course.id}
                         className="p-4 border rounded-lg hover:bg-green-50 transition cursor-pointer group"
                       >
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <h3 className="font-semibold text-gray-900 group-hover:text-green-600">
                               {course.title}
@@ -208,15 +279,6 @@ export default function Homepage({
                           <Badge variant="outline" className="ml-2">
                             {course.progress || 0}%
                           </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={course.progress || 0}
-                            className="flex-1 h-2"
-                          />
-                          <span className="text-xs text-gray-600 whitespace-nowrap">
-                            {course.progress || 0}%
-                          </span>
                         </div>
                       </div>
                     ))}

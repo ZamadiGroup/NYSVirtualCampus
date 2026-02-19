@@ -910,8 +910,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // filter by status if requested
       if (status && typeof status === 'string') {
-        if (status === 'submitted') pipeline.push({ $match: { 'grade': { $exists: false } } });
-        if (status === 'graded') pipeline.push({ $match: { 'grade': { $exists: true } } });
+        if (status === 'submitted') {
+          pipeline.push({
+            $match: {
+              $or: [{ grade: null }, { grade: { $exists: false } }],
+            },
+          });
+        }
+        if (status === 'graded') {
+          pipeline.push({
+            $match: {
+              $and: [{ grade: { $ne: null } }, { 'grade._id': { $exists: true } }],
+            },
+          });
+        }
       }
 
       // Sorting (newest submissions first)
@@ -930,6 +942,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Map results to a simpler shape
       const items = data.map((d: any) => ({
         _id: d._id,
+        assignmentId: d.assignment?._id || d.assignmentId,
+        studentId: d.student?._id || d.studentId,
         assignment: d.assignment || null,
         course: d.course || null,
         student: d.student || null,
@@ -949,26 +963,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/submissions", authenticate, requireRole(["student"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
-      // Force studentId to the authenticated user to prevent spoofing
-      const submissionPayload = { ...req.body, studentId: authReq.user.userId };
-      const newSubmission = new Submission(submissionPayload);
-      await newSubmission.save();
+      const { assignmentId, answers, uploadLink } = req.body || {};
+      if (!assignmentId || !mongoose.Types.ObjectId.isValid(String(assignmentId))) {
+        return res.status(400).json({ error: 'Valid assignmentId is required' });
+      }
+
+      const assignment = await Assignment.findById(assignmentId);
+      if (!assignment || assignment.isActive === false) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+
+      const isEnrolled = await Enrollment.exists({
+        courseId: assignment.courseId,
+        studentId: authReq.user.userId,
+      });
+      if (!isEnrolled) {
+        return res.status(403).json({ error: 'You are not enrolled in this course' });
+      }
+
+      // Normalize answer payload to a string map
+      const normalizedAnswers: Record<string, string> = {};
+      if (answers && typeof answers === 'object') {
+        Object.entries(answers).forEach(([key, value]) => {
+          normalizedAnswers[String(key)] = typeof value === 'string' ? value : String(value ?? '');
+        });
+      }
+
+      // Upsert one submission per student+assignment (resubmission updates previous attempt)
+      const submissionPayload: any = {
+        assignmentId,
+        studentId: authReq.user.userId,
+        answers: normalizedAnswers,
+        uploadLink: typeof uploadLink === 'string' ? uploadLink : undefined,
+        submittedAt: new Date(),
+      };
+
+      const newSubmission = await Submission.findOneAndUpdate(
+        { assignmentId, studentId: authReq.user.userId },
+        { $set: submissionPayload },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      );
       
       // Auto-grade if assignment type is "auto"
-      const assignment = await Assignment.findById(req.body.assignmentId);
       if (assignment && assignment.type === "auto") {
         // Simple auto-grading logic
-        const score = Object.values(req.body.answers || {}).filter((answer: any) => answer.trim()).length;
-        const newGrade = new Grade({
-          assignmentId: req.body.assignmentId,
-          // attribute grade to the authenticated student (or the saved submission studentId)
-          studentId: (newSubmission as any).studentId || authReq.user.userId,
-          score,
-          maxScore: assignment.maxScore || 100,
-          status: "graded",
-          gradedAt: new Date(),
-        });
-        await newGrade.save();
+        const score = Object.values(normalizedAnswers).filter((answer: any) => String(answer).trim()).length;
+        await Grade.findOneAndUpdate(
+          {
+            assignmentId,
+            studentId: authReq.user.userId,
+          },
+          {
+            $set: {
+              score,
+              maxScore: assignment.maxScore || 100,
+              status: 'graded',
+              gradedAt: new Date(),
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
       }
       
       res.json(newSubmission);

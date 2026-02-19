@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { MaterialCard } from "@/components/MaterialCard";
 import { AssignmentCard } from "@/components/AssignmentCard";
 import { AnnouncementCard } from "@/components/AnnouncementCard";
@@ -56,15 +55,16 @@ function parseJwt(token?: string | null) {
 
 type CourseDetailProps = {
   courseId?: string;
+  onOpenAssignment?: (id: string) => void;
 };
 
-export default function CourseDetail({ courseId }: CourseDetailProps) {
+export default function CourseDetail({
+  courseId,
+  onOpenAssignment,
+}: CourseDetailProps) {
   const [course, setCourse] = useState<ApiCourse | null>(null);
   const [newChapterTitle, setNewChapterTitle] = useState("");
   const [newChapterDesc, setNewChapterDesc] = useState("");
-  const [editMode, setEditMode] = useState(false);
-  const [editNotes, setEditNotes] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
   const [editCourseMode, setEditCourseMode] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -82,6 +82,10 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
   const [completedLessons, setCompletedLessons] = useState<
     Record<string, boolean>
   >({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [viewerTitle, setViewerTitle] = useState("");
+  const [viewerType, setViewerType] = useState<"pdf" | "video" | "link">("pdf");
   const { toast: toastHook } = useToast();
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -405,7 +409,9 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">145</p>
+                <p className="text-2xl font-bold">
+                  {course?.enrollEmails?.length || 0}
+                </p>
                 <p className="text-sm text-muted-foreground">Students</p>
               </div>
             </div>
@@ -418,7 +424,7 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                 <Clock className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">65%</p>
+                <p className="text-2xl font-bold">{progress}%</p>
                 <p className="text-sm text-muted-foreground">Progress</p>
               </div>
             </div>
@@ -431,7 +437,12 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                 <BookOpen className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">24</p>
+                <p className="text-2xl font-bold">
+                  {course?.chapters?.reduce(
+                    (sum, ch) => sum + (ch.materials?.length || 0),
+                    0,
+                  ) || 0}
+                </p>
                 <p className="text-sm text-muted-foreground">Materials</p>
               </div>
             </div>
@@ -444,109 +455,13 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                 <Award className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">85%</p>
-                <p className="text-sm text-muted-foreground">Avg. Grade</p>
+                <p className="text-2xl font-bold">{assignments.length}</p>
+                <p className="text-sm text-muted-foreground">Assignments</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Course Progress</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Overall Completion</span>
-            <span className="font-medium">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-3" />
-        </CardContent>
-      </Card>
-      {course && (
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <CardTitle>Course Notes</CardTitle>
-            {canEdit && !editMode && (
-              <div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditNotes(course.notes || "");
-                    setEditMode(true);
-                  }}
-                >
-                  Edit
-                </Button>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent>
-            {!editMode ? (
-              <div className="prose max-w-none">
-                <p>
-                  {course.notes || (
-                    <span className="text-muted-foreground">
-                      No notes for this course.
-                    </span>
-                  )}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Textarea
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={6}
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditMode(false);
-                      setEditNotes("");
-                    }}
-                    disabled={savingNotes}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        setSavingNotes(true);
-                        const updated = await coursesApi.update(course.id, {
-                          notes: editNotes,
-                        });
-                        setCourse(updated as ApiCourse);
-                        toastHook({
-                          title: "Notes saved",
-                          description: "Course notes updated successfully.",
-                        });
-                        setEditMode(false);
-                      } catch (err: any) {
-                        console.error("Failed to save notes", err);
-                        toastHook({
-                          title: "Save failed",
-                          description:
-                            (err && err.message) || "Unable to save notes",
-                          variant: "destructive",
-                        });
-                      } finally {
-                        setSavingNotes(false);
-                      }
-                    }}
-                    disabled={savingNotes}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <Tabs
         defaultValue={currentUser?.role === "student" ? "modules" : "materials"}
@@ -831,8 +746,22 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
             type="pdf"
             size="2.4 MB"
             uploadedAt={today}
-            onDownload={() => console.log("Download material")}
-            onView={() => console.log("View material")}
+            onDownload={() => {
+              setViewerTitle("Introduction to Databases - Lecture Notes.pdf");
+              setViewerType("pdf");
+              setViewerUrl(
+                "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+              );
+              setViewerOpen(true);
+            }}
+            onView={() => {
+              setViewerTitle("Introduction to Databases - Lecture Notes.pdf");
+              setViewerType("pdf");
+              setViewerUrl(
+                "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+              );
+              setViewerOpen(true);
+            }}
           />
           <MaterialCard
             id="2"
@@ -840,15 +769,36 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
             type="video"
             size="45 MB"
             uploadedAt={today}
-            onDownload={() => console.log("Download material")}
-            onView={() => console.log("View material")}
+            onDownload={() => {
+              setViewerTitle("Database Normalization Tutorial Video");
+              setViewerType("video");
+              setViewerUrl("https://www.w3schools.com/html/mov_bbb.mp4");
+              setViewerOpen(true);
+            }}
+            onView={() => {
+              setViewerTitle("Database Normalization Tutorial Video");
+              setViewerType("video");
+              setViewerUrl("https://www.w3schools.com/html/mov_bbb.mp4");
+              setViewerOpen(true);
+            }}
           />
           <MaterialCard
             id="3"
             title="SQL Practice Exercises - External Resource"
             type="link"
             uploadedAt={today}
-            onView={() => console.log("Open link")}
+            onDownload={() => {
+              setViewerTitle("SQL Practice Exercises - External Resource");
+              setViewerType("link");
+              setViewerUrl("https://www.w3schools.com/sql/exercise.asp");
+              setViewerOpen(true);
+            }}
+            onView={() => {
+              setViewerTitle("SQL Practice Exercises - External Resource");
+              setViewerType("link");
+              setViewerUrl("https://www.w3schools.com/sql/exercise.asp");
+              setViewerOpen(true);
+            }}
           />
         </TabsContent>
 
@@ -877,10 +827,20 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                             type={(m.type as any) || "pdf"}
                             uploadedAt={new Date()}
                             onDownload={() => {
-                              if (m.url) window.open(m.url, "_blank");
+                              if (m.url) {
+                                setViewerTitle(titleStr);
+                                setViewerType((m.type as any) || "pdf");
+                                setViewerUrl(m.url);
+                                setViewerOpen(true);
+                              }
                             }}
                             onView={() => {
-                              if (m.url) window.open(m.url, "_blank");
+                              if (m.url) {
+                                setViewerTitle(titleStr);
+                                setViewerType((m.type as any) || "pdf");
+                                setViewerUrl(m.url);
+                                setViewerOpen(true);
+                              }
                             }}
                           />
                         );
@@ -977,7 +937,8 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
                       dueDate={a.dueDate ? new Date(a.dueDate) : new Date()}
                       status={a.status || "pending"}
                       grade={a.grade}
-                      onView={() => console.log("View submission")}
+                      onSubmit={() => onOpenAssignment?.(a.id || a._id)}
+                      onView={() => onOpenAssignment?.(a.id || a._id)}
                     />
                     {canEdit && (
                       <div className="absolute top-2 right-2 flex gap-2">
@@ -1095,6 +1056,41 @@ export default function CourseDetail({ courseId }: CourseDetailProps) {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* File Viewer Dialog */}
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent className="max-w-6xl h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{viewerTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 h-full overflow-hidden">
+            {viewerType === "pdf" && (
+              <iframe
+                src={viewerUrl}
+                className="w-full h-full border-0"
+                title={viewerTitle}
+              />
+            )}
+            {viewerType === "video" && (
+              <video
+                src={viewerUrl}
+                controls
+                className="w-full h-full"
+                title={viewerTitle}
+              >
+                Your browser does not support the video tag.
+              </video>
+            )}
+            {viewerType === "link" && (
+              <iframe
+                src={viewerUrl}
+                className="w-full h-full border-0"
+                title={viewerTitle}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

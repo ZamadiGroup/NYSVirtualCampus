@@ -140,7 +140,7 @@ export const gradesApi = {
     const queryString = params.toString();
     return apiCall(`/grades${queryString ? `?${queryString}` : ''}`);
   },
-  update: (id: string, gradeData: { manualScore?: number; feedback?: string }) => apiCall(`/grades/${id}`, {
+  update: (id: string, gradeData: { manualScore?: number; score?: number; feedback?: string }) => apiCall(`/grades/${id}`, {
     method: 'PUT',
     body: JSON.stringify(gradeData),
   }),

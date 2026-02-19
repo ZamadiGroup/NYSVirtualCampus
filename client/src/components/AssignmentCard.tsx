@@ -1,4 +1,9 @@
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, FileText } from "lucide-react";
@@ -24,6 +29,12 @@ export function AssignmentCard({
   onSubmit,
   onView,
 }: AssignmentCardProps) {
+  console.log("AssignmentCard rendered:", {
+    title,
+    onSubmit: !!onSubmit,
+    onView: !!onView,
+  });
+
   const statusConfig = {
     pending: { label: "Pending", variant: "secondary" as const },
     submitted: { label: "Submitted", variant: "default" as const },
@@ -38,7 +49,10 @@ export function AssignmentCard({
     <Card className="hover-elevate" data-testid={`card-assignment-${title}`}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
         <div className="space-y-1 flex-1">
-          <h3 className="font-semibold leading-tight" data-testid="text-assignment-title">
+          <h3
+            className="font-semibold leading-tight"
+            data-testid="text-assignment-title"
+          >
             {title}
           </h3>
           <p className="text-sm text-muted-foreground">{courseName}</p>
@@ -62,7 +76,7 @@ export function AssignmentCard({
         )}
       </CardContent>
       <CardFooter className="gap-2">
-        {status === "pending" && (
+        {(status === "pending" || status === "overdue") && (
           <Button
             onClick={onSubmit}
             className="flex-1"
