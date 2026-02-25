@@ -83,7 +83,7 @@ export function AssignmentCard({
             data-testid="button-submit-assignment"
           >
             <FileText className="mr-2 h-4 w-4" />
-            Submit Assignment
+            Start Assignment
           </Button>
         )}
         {(status === "submitted" || status === "graded") && (

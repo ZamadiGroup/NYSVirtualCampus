@@ -115,13 +115,26 @@ export default function SubmissionsPage() {
     );
   }, [submissions, searchTerm]);
 
-  const openGrade = (submission: any) => {
+const openGrade = (submission: any) => {
     setGradingDraft({ 
       submission, 
       score: submission.grade?.score ?? submission.assignmentId?.maxScore ?? submission.assignment?.maxScore ?? 100, 
-      feedback: submission.grade?.feedback || '' 
+      feedback: submission.grade?.feedback || '',
+      showAnswers: false 
     });
+    loadSubmissionDetails(submission._id);
     setIsGradingOpen(true);
+  };
+
+  const loadSubmissionDetails = async (submissionId: string) => {
+    try {
+      const details = await submissionsApi.getById(submissionId);
+      if (gradingDraft) {
+        setGradingDraft({ ...gradingDraft, submissionDetails: details });
+      }
+    } catch (err) {
+      console.error('Failed to load submission details:', err);
+    }
   };
 
   const openViewGrade = (submission: any) => {
@@ -449,18 +462,49 @@ export default function SubmissionsPage() {
                           <DialogTrigger asChild>
                             <Button onClick={() => openGrade(s)}>Grade</Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Grade Submission</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <label className="text-sm block mb-1">Score</label>
-                                <Input type="number" value={gradingDraft?.score ?? ''} onChange={(e) => setGradingDraft({ ...gradingDraft, score: Number(e.target.value) })} />
+                                <p className="text-sm"><strong>Student:</strong> {gradingDraft?.submission.student?.fullName || gradingDraft?.submission.studentId?.fullName}</p>
+                                <p className="text-sm"><strong>Assignment:</strong> {gradingDraft?.submission.assignment?.title || gradingDraft?.submission.assignmentId?.title}</p>
+                                <p className="text-sm"><strong>Type:</strong> {gradingDraft?.submission.assignment?.type || gradingDraft?.submission.assignmentId?.type}</p>
+                              </div>
+
+                              {/* Answer Details for Auto-Graded Assignments */}
+                              {(gradingDraft?.submission.assignment?.type === 'auto' || gradingDraft?.submission.assignmentId?.type === 'auto') && gradingDraft?.submissionDetails?.submission?.detailedQuestions && (
+                                <div className="border rounded-lg p-4 bg-muted/50 max-h-96 overflow-y-auto">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <h4 className="font-semibold text-sm">Answer Review</h4>
+                                    <Badge variant={gradingDraft?.submissionDetails?.submission?.detailedQuestions?.every((q: any) => q.isCorrect) ? 'default' : 'secondary'}>
+                                      {gradingDraft?.submissionDetails?.submission?.detailedQuestions?.filter((q: any) => q.isCorrect).length} / {gradingDraft?.submissionDetails?.submission?.detailedQuestions?.length} Correct
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {gradingDraft?.submissionDetails?.submission?.detailedQuestions?.map((question: any, idx: number) => (
+                                      <div key={idx} className="border rounded p-3 text-sm">
+                                        <p className="font-medium mb-2">Q{question.index + 1}: {question.text}</p>
+                                        <div className="space-y-1 text-xs">
+                                          <p>Your Answer: <span className={question.isCorrect ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{question.studentAnswer || '(No answer)'}</span></p>
+                                          {!question.isCorrect && (
+                                            <p>Correct Answer: <span className="text-green-600 font-semibold">{question.correctAnswer}</span></p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div>
+                                <label className="text-sm block mb-1 font-medium">Score</label>
+                                <Input type="number" value={gradingDraft?.score ?? ''} onChange={(e) => setGradingDraft({ ...gradingDraft, score: Number(e.target.value) })} max={gradingDraft?.submission.assignmentId?.maxScore || gradingDraft?.submission.assignment?.maxScore || 100} />
                               </div>
                               <div>
-                                <label className="text-sm block mb-1">Feedback (optional)</label>
-                                <Textarea value={gradingDraft?.feedback ?? ''} onChange={(e) => setGradingDraft({ ...gradingDraft, feedback: e.target.value })} rows={6} />
+                                <label className="text-sm block mb-1 font-medium">Feedback (optional)</label>
+                                <Textarea value={gradingDraft?.feedback ?? ''} onChange={(e) => setGradingDraft({ ...gradingDraft, feedback: e.target.value })} rows={4} placeholder="Provide feedback to the student..." />
                               </div>
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" onClick={() => { setIsGradingOpen(false); setGradingDraft(null); }}>Cancel</Button>

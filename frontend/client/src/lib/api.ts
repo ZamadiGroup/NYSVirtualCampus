@@ -125,6 +125,8 @@ export const submissionsApi = {
     const queryString = params.toString();
     return apiCall(`/submissions${queryString ? `?${queryString}` : ''}`);
   },
+  getById: (id: string) => apiCall(`/submissions/${id}`),
+  getMySubmissionStatus: (assignmentId: string) => apiCall(`/assignments/${assignmentId}/my-submission`),
   create: (submissionData: any) => apiCall('/submissions', {
     method: 'POST',
     body: JSON.stringify(submissionData),

@@ -18,6 +18,7 @@ import Auth from "@/pages/Auth";
 import StudentDashboard from "@/pages/StudentDashboard";
 import TutorDashboard from "@/pages/TutorDashboard";
 import TutorAssignments from "@/components/TutorAssignments";
+import TutorAssignmentReview from "@/pages/TutorAssignmentReview";
 import { AssignmentCard } from "@/components/AssignmentCard";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Users from "@/pages/Users";
@@ -112,12 +113,18 @@ function App() {
     setCurrentPage(page as any);
   };
 
+  const normalizeAssignment = (a: any) => ({
+    ...a,
+    id: a.id || a._id  // Ensure id field exists
+  });
+
   // Fetch authoritative assignments list from server on mount
   const fetchAssignments = async () => {
     try {
       const serverAssignments = await assignmentsApi.getAll();
-      // serverAssignments may include populated course title; ensure shape matches AssignmentWithDue
-      setAssignments(Array.isArray(serverAssignments) ? serverAssignments : []);
+      // Normalize MongoDB _id to id field for consistent access
+      const normalized = Array.isArray(serverAssignments) ? serverAssignments.map(normalizeAssignment) : [];
+      setAssignments(normalized);
     } catch (err) {
       // keep existing local assignments on failure
       console.error("Failed to fetch assignments", err);
@@ -330,12 +337,12 @@ function App() {
                               setCurrentPage("assignment-detail");
                             }}
                             onAddAssignment={(a: any) =>
-                              setAssignments((prev) => [a, ...prev])
+                              setAssignments((prev) => [normalizeAssignment(a), ...prev])
                             }
                             onUpdateAssignment={(a: any) =>
                               setAssignments((prev) =>
                                 prev.map((x) =>
-                                  x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                                  x.id === (a.id || a._id) ? normalizeAssignment({ ...x, ...a }) : x,
                                 ),
                               )
                             }
@@ -687,8 +694,14 @@ function App() {
                       })()}
                     {view === "tutor" &&
                       currentPage === "assignment-detail" &&
-                      selectedAssignmentId &&
-                      (() => {
+                      selectedAssignmentId && (
+                        <TutorAssignmentReview
+                          assignmentId={selectedAssignmentId}
+                        />
+                      )}
+                    {view === "student" &&
+                      currentPage === "assignment-detail" &&
+                      selectedAssignmentId && (() => {
                         const a = assignments.find(
                           (x) => x.id === selectedAssignmentId,
                         )!;
@@ -697,18 +710,18 @@ function App() {
                           <AssignmentDetail
                             assignment={a}
                             onSubmit={() => {
-                              // Record that some action happened; tutors won't 'submit' but keep analytics
-                              setAdminItems((prev) => [
+                              // Record that submission happened
+                              setGrades((prev) => [
                                 {
-                                  id: `adm-action-${Date.now()}`,
-                                  type: "assignment",
-                                  ownerRole: "tutor",
-                                  ownerName: "Dr. Sarah Kamau",
-                                  description: `Viewed assignment: ${a.title}`,
-                                  createdAt: new Date().toISOString(),
+                                  assignmentId: a.id,
+                                  assignmentTitle: a.title,
+                                  courseId: a.courseId,
+                                  maxScore: 100,
+                                  status: "pending",
                                 },
                                 ...prev,
                               ]);
+                              setCurrentPage("student-grades");
                             }}
                           />
                         );
@@ -810,12 +823,12 @@ function App() {
                           setCurrentPage("assignment-detail");
                         }}
                         onAddAssignment={(a: any) =>
-                          setAssignments((prev) => [a, ...prev])
+                          setAssignments((prev) => [normalizeAssignment(a), ...prev])
                         }
                         onUpdateAssignment={(a: any) =>
                           setAssignments((prev) =>
                             prev.map((x) =>
-                              x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                              x.id === (a.id || a._id) ? normalizeAssignment({ ...x, ...a }) : x,
                             ),
                           )
                         }
@@ -850,12 +863,12 @@ function App() {
                           setCurrentPage("assignment-detail");
                         }}
                         onAddAssignment={(a: any) =>
-                          setAssignments((prev) => [a, ...prev])
+                          setAssignments((prev) => [normalizeAssignment(a), ...prev])
                         }
                         onUpdateAssignment={(a: any) =>
                           setAssignments((prev) =>
                             prev.map((x) =>
-                              x.id === (a.id || a._id) ? { ...x, ...a } : x,
+                              x.id === (a.id || a._id) ? normalizeAssignment({ ...x, ...a }) : x,
                             ),
                           )
                         }

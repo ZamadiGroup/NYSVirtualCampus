@@ -865,95 +865,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pg = Math.max(1, parseInt(page, 10) || 1);
       const lim = Math.max(1, Math.min(200, parseInt(limit, 10) || 20));
-
       const mongoose = require('mongoose');
 
-      // Build aggregation pipeline
-      const pipeline: any[] = [];
+      // Build query filters
+      const query: any = {};
+      
+      if (assignmentId) {
+        if (!mongoose.Types.ObjectId.isValid(assignmentId)) {
+          return res.status(400).json({ error: 'Invalid assignmentId format' });
+        }
+        query.assignmentId = new mongoose.Types.ObjectId(assignmentId);
+      }
+      
+      if (studentId) {
+        if (!mongoose.Types.ObjectId.isValid(studentId)) {
+          return res.status(400).json({ error: 'Invalid studentId format' });
+        }
+        query.studentId = new mongoose.Types.ObjectId(studentId);
+      }
 
-      // initial match on submission-level fields
-      const match: any = {};
-      if (assignmentId) match.assignmentId = new mongoose.Types.ObjectId(assignmentId);
-      if (studentId) match.studentId = new mongoose.Types.ObjectId(studentId);
-      if (Object.keys(match).length) pipeline.push({ $match: match });
+      // Get total count for pagination
+      const total = await Submission.countDocuments(query);
 
-      // lookup assignment
-      pipeline.push(
-        { $lookup: { from: 'assignments', localField: 'assignmentId', foreignField: '_id', as: 'assignment' } },
-        { $unwind: { path: '$assignment', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: 'courses', localField: 'assignment.courseId', foreignField: '_id', as: 'course' } },
-        { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: 'users', localField: 'studentId', foreignField: '_id', as: 'student' } },
-        { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
-        // lookup grade for this assignment+student
-        { $lookup: {
-            from: 'grades',
-            let: { aId: '$assignment._id', sId: '$student._id' },
-            pipeline: [
-              { $match: { $expr: { $and: [ { $eq: ['$assignmentId', '$$aId'] }, { $eq: ['$studentId', '$$sId'] } ] } } },
-              { $sort: { gradedAt: -1 } },
-            ],
-            as: 'grade'
-        } },
-        { $unwind: { path: '$grade', preserveNullAndEmptyArrays: true } }
-      );
+      // Fetch submissions with proper population
+      const data = await Submission.find(query)
+        .populate('assignmentId')
+        .populate('studentId', 'fullName email')
+        .sort({ submittedAt: -1 })
+        .skip((pg - 1) * lim)
+        .limit(lim);
 
-      // filter by courseId if provided
+      // Fetch grades for these submissions
+      const gradeMap: any = {};
+      if (data.length > 0) {
+        const grades = await Grade.find({
+          $or: data.map(d => ({
+            assignmentId: d.assignmentId,
+            studentId: d.studentId
+          }))
+        });
+        grades.forEach(g => {
+          const key = `${g.assignmentId}_${g.studentId}`;
+          gradeMap[key] = g;
+        });
+      }
+
+      // Filter by courseId if provided
+      let filteredData = data;
       if (courseId) {
-        pipeline.push({ $match: { 'assignment.courseId': new mongoose.Types.ObjectId(courseId) } });
+        if (!mongoose.Types.ObjectId.isValid(courseId)) {
+          return res.status(400).json({ error: 'Invalid courseId format' });
+        }
+        filteredData = data.filter((d: any) => 
+          d.assignmentId?.courseId?.toString() === courseId
+        );
       }
 
       // Enforce tutor access: only submissions for courses they instruct
       if (authReq.user.role === 'tutor') {
-        pipeline.push({ $match: { 'course.instructorId': new mongoose.Types.ObjectId(authReq.user.userId) } });
+        filteredData = filteredData.filter((d: any) => {
+          const assignment = d.assignmentId as any;
+          const course = assignment?.courseId as any;
+          return course?.instructorId?.toString() === authReq.user.userId;
+        });
       }
 
-      // filter by status if requested
-      if (status && typeof status === 'string') {
-        if (status === 'submitted') {
-          pipeline.push({
-            $match: {
-              $or: [{ grade: null }, { grade: { $exists: false } }],
-            },
-          });
-        }
-        if (status === 'graded') {
-          pipeline.push({
-            $match: {
-              $and: [{ grade: { $ne: null } }, { 'grade._id': { $exists: true } }],
-            },
-          });
-        }
-      }
+      // Map results
+      const items = filteredData.map((d: any) => {
+        const gradeKey = `${d.assignmentId?._id}_${d.studentId?._id}`;
+        const grade = gradeMap[gradeKey] || null;
+        
+        return {
+          _id: d._id,
+          assignmentId: d.assignmentId?._id || d.assignmentId,
+          studentId: d.studentId?._id || d.studentId,
+          assignment: d.assignmentId || null,
+          student: d.studentId || null,
+          answers: d.answers || {},
+          uploadLink: d.uploadLink || null,
+          submittedAt: d.submittedAt || d.createdAt,
+          grade: grade || null,
+        };
+      });
 
-      // Sorting (newest submissions first)
-      pipeline.push({ $sort: { submittedAt: -1 } });
-
-      // Facet for pagination + total
-      pipeline.push({ $facet: {
-        metadata: [ { $count: 'total' } ],
-        data: [ { $skip: (pg - 1) * lim }, { $limit: lim } ]
-      } });
-
-      const agg = await Submission.aggregate(pipeline).exec();
-      const metadata = (agg[0]?.metadata && agg[0].metadata[0]) || { total: 0 };
-      const data = agg[0]?.data || [];
-
-      // Map results to a simpler shape
-      const items = data.map((d: any) => ({
-        _id: d._id,
-        assignmentId: d.assignment?._id || d.assignmentId,
-        studentId: d.student?._id || d.studentId,
-        assignment: d.assignment || null,
-        course: d.course || null,
-        student: d.student || null,
-        answers: d.answers || {},
-        uploadLink: d.uploadLink || null,
-        submittedAt: d.submittedAt || d.createdAt,
-        grade: d.grade || null,
-      }));
-
-      res.json({ items, total: metadata.total || 0, page: pg, limit: lim });
+      res.json({ items, total: items.length, page: pg, limit: lim });
     } catch (error) {
       console.error("Error fetching submissions:", error);
       res.status(500).json({ error: "Failed to fetch submissions" });
@@ -1006,8 +1001,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Auto-grade if assignment type is "auto"
       if (assignment && assignment.type === "auto") {
-        // Simple auto-grading logic
-        const score = Object.values(normalizedAnswers).filter((answer: any) => String(answer).trim()).length;
+        // Smart auto-grading logic - check against correct answers
+        let correctCount = 0;
+        let totalQuestions = assignment.questions?.length || 0;
+        
+        if (totalQuestions > 0 && assignment.questions) {
+          assignment.questions.forEach((q, index) => {
+            const studentAnswer = normalizedAnswers[String(index)]?.trim().toLowerCase() || '';
+            const correctAnswer = q.correctAnswer?.trim().toLowerCase() || '';
+            
+            if (studentAnswer === correctAnswer) {
+              correctCount++;
+            }
+          });
+        }
+        
+        // Calculate score based on percentage of correct answers
+        const scorePercentage = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+        const maxScore = assignment.maxScore || 100;
+        const score = (scorePercentage / 100) * maxScore;
+        
         await Grade.findOneAndUpdate(
           {
             assignmentId,
@@ -1015,8 +1028,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           {
             $set: {
-              score,
-              maxScore: assignment.maxScore || 100,
+              score: Math.round(score * 100) / 100, // Round to 2 decimal places
+              maxScore,
               status: 'graded',
               gradedAt: new Date(),
             },
@@ -1110,6 +1123,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating grade:", error);
       res.status(500).json({ error: "Failed to update grade" });
+    }
+  });
+
+  // Get detailed submission with comparison to correct answers (for tutor review)
+  router.get("/submissions/:id", authenticate, async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const submission = await Submission.findById(req.params.id)
+        .populate({
+          path: 'assignmentId',
+          populate: {
+            path: 'courseId',
+            select: 'instructorId title'
+          }
+        })
+        .populate('studentId', 'fullName email');
+
+      if (!submission) {
+        return res.status(404).json({ error: 'Submission not found' });
+      }
+
+      const assignment = submission.assignmentId as any;
+      
+      // Check authorization: tutor must be instructor or admin
+      if (authReq.user.role === 'tutor') {
+        if (assignment?.courseId?.instructorId?.toString() !== authReq.user.userId) {
+          return res.status(403).json({ error: 'Unauthorized' });
+        }
+      }
+
+      // Get the grade for this submission
+      const grade = await Grade.findOne({
+        assignmentId: submission.assignmentId,
+        studentId: submission.studentId
+      });
+
+      // Build detailed response with answer comparison
+      const detailedQuestions = assignment?.questions?.map((q: any, idx: number) => ({
+        index: idx,
+        text: q.text,
+        imageUrl: q.imageUrl,
+        choices: q.choices,
+        correctAnswer: q.correctAnswer,
+        studentAnswer: submission.answers?.get ? submission.answers.get(String(idx)) : (submission.answers as any)?.[String(idx)],
+        isCorrect: (submission.answers?.get ? submission.answers.get(String(idx)) : (submission.answers as any)?.[String(idx)])
+          ?.toLowerCase() === q.correctAnswer?.toLowerCase()
+      })) || [];
+
+      res.json({
+        submission: {
+          _id: submission._id,
+          assignment: assignment,
+          student: submission.studentId,
+          answers: submission.answers,
+          uploadLink: submission.uploadLink,
+          submittedAt: submission.submittedAt,
+          detailedQuestions
+        },
+        grade
+      });
+    } catch (error) {
+      console.error("Error fetching submission detail:", error);
+      res.status(500).json({ error: "Failed to fetch submission" });
+    }
+  });
+
+  // Get student's submission and grade status for an assignment (for student view)
+  router.get("/assignments/:assignmentId/my-submission", authenticate, requireRole(["student"]), async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const { assignmentId } = req.params;
+
+      // Validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(assignmentId)) {
+        return res.status(400).json({ error: 'Invalid assignment ID' });
+      }
+
+      const submission = await Submission.findOne({
+        assignmentId: new mongoose.Types.ObjectId(assignmentId),
+        studentId: authReq.user.userId
+      }).populate('assignmentId');
+
+      const grade = await Grade.findOne({
+        assignmentId: new mongoose.Types.ObjectId(assignmentId),
+        studentId: authReq.user.userId
+      });
+
+      if (!submission) {
+        return res.json({
+          submitted: false,
+          submission: null,
+          grade: null
+        });
+      }
+
+      res.json({
+        submitted: true,
+        submission: {
+          _id: submission._id,
+          submittedAt: submission.submittedAt,
+        },
+        grade: grade ? {
+          _id: grade._id,
+          score: grade.score,
+          maxScore: grade.maxScore,
+          status: grade.status,
+          feedback: grade.feedback,
+          gradedAt: grade.gradedAt
+        } : null
+      });
+    } catch (error) {
+      console.error("Error fetching my submission:", error);
+      res.status(500).json({ error: "Failed to fetch submission status" });
     }
   });
 
