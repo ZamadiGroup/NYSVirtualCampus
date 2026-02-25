@@ -46,7 +46,7 @@ export async function setupVite(app: Express, server: Server) {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(process.cwd(), "client", "index.html");
+      const clientTemplate = path.resolve(process.cwd(), "..", "frontend", "client", "index.html");
 
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
@@ -65,7 +65,7 @@ export async function setupVite(app: Express, server: Server) {
 
 export function serveStatic(app: Express) {
   // ✅ MUST match your Vite outDir: dist/public
-  const publicPath = path.resolve(process.cwd(), "dist", "public");
+  const publicPath = path.resolve(process.cwd(), "..", "dist", "public");
   const indexPath = path.join(publicPath, "index.html");
 
   log(`[serveStatic] Serving static from: ${publicPath}`);

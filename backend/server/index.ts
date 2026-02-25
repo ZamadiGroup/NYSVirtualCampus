@@ -1,7 +1,13 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Load .env from backend directory
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
-import path from "path";
 import fs from "fs";
 
 import { registerRoutes } from "./routes";

@@ -6,11 +6,18 @@ export const connectDB = async () => {
     if (process.env.MONGODB_URI) {
       // Prefer MongoDB when MONGODB_URI is provided
       try {
-        await mongoose.connect(process.env.MONGODB_URI);
+        // Use native DNS resolution to bypass Node.js DNS issues on Windows
+        await mongoose.connect(process.env.MONGODB_URI, {
+          serverSelectionTimeoutMS: 10000,
+          socketTimeoutMS: 45000,
+          family: 4, // Force IPv4
+        });
         console.log('✅ Connected to MongoDB Atlas');
+        console.log('📍 Database:', mongoose.connection.db?.databaseName);
         return;
       } catch (mongoError) {
-        console.warn('⚠️ MongoDB connection failed, continuing without MongoDB:', (mongoError as Error).message);
+        console.error('❌ MongoDB connection failed:', (mongoError as Error).message);
+        console.error('Connection string (masked):', process.env.MONGODB_URI?.replace(/:[^:@]*@/, ':****@'));
         // Don't re-throw - allow app to continue with other databases
       }
     }

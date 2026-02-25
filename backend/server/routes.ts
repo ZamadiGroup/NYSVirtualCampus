@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if database is connected
       if (mongoose.connection.readyState !== 1) {
-        return res.status(503).json({ error: "Database not available" });
+        return res.status(503).json({ error: "Database not available - Please whitelist IP 41.90.179.245 in MongoDB Atlas" });
       }
 
       // Find user by email
