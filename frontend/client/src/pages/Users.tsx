@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { usersApi, type ApiUser } from "@/lib/api";
 import { Users, UserPlus, Search, Filter } from "lucide-react";
+import BulkAddUsersDialog from "@/components/BulkAddUsersDialog";
 
 export default function UsersPage() {
   const { toast } = useToast();
@@ -345,13 +346,15 @@ export default function UsersPage() {
             <h2 className="text-xl font-semibold">
               All Users ({filteredUsers.length})
             </h2>
-            <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add User
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <BulkAddUsersDialog onDone={loadUsers} />
+              <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add User
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
@@ -426,7 +429,8 @@ export default function UsersPage() {
                   </Button>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
 
           <Card>

@@ -38,6 +38,10 @@ export const usersApi = {
     body: JSON.stringify(userData),
   }),
   graduate: (id: string) => apiCall(`/users/${id}/graduate`, { method: 'POST' }),
+  bulkCreate: (users: any[]) => apiCall('/users/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ users }),
+  }),
 };
 
 // Courses API

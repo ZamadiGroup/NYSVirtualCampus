@@ -212,6 +212,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk create users from CSV/Excel (admin only)
+  router.post("/users/bulk", authenticate, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { users } = req.body as { users: any[] };
+      if (!Array.isArray(users) || users.length === 0) {
+        return res.status(400).json({ error: "users array is required and must not be empty" });
+      }
+      if (users.length > 500) {
+        return res.status(400).json({ error: "Maximum 500 users per bulk import" });
+      }
+
+      const created: string[] = [];
+      const failed: { row: number; email: string; error: string }[] = [];
+
+      for (let i = 0; i < users.length; i++) {
+        const u = users[i];
+        const { fullName, email, password, role, department } = u;
+
+        if (!fullName || !email || !password) {
+          failed.push({ row: i + 1, email: email || '(missing)', error: "fullName, email and password are required" });
+          continue;
+        }
+
+        const username = email.split('@')[0];
+        const validRoles = ['student', 'tutor', 'admin'];
+        const userRole = validRoles.includes(role) ? role : 'student';
+
+        try {
+          const exists = await User.findOne({ $or: [{ email }, { username }] });
+          if (exists) {
+            failed.push({ row: i + 1, email, error: exists.email === email ? "Email already exists" : "Username already taken" });
+            continue;
+          }
+          const hashed = await bcrypt.hash(password, 10);
+          await new User({ username, fullName, email, password: hashed, role: userRole, department: department || undefined }).save();
+          created.push(email);
+        } catch (err: any) {
+          const msg = err.code === 11000 ? "Duplicate entry" : (err.message || "Failed to create");
+          failed.push({ row: i + 1, email: email || '(unknown)', error: msg });
+        }
+      }
+
+      res.json({ total: users.length, created: created.length, failed });
+    } catch (error: any) {
+      console.error("Bulk create error:", error);
+      res.status(500).json({ error: "Bulk import failed" });
+    }
+  });
+
   router.post("/users", authenticate, requireRole(["admin"]), async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     try {
