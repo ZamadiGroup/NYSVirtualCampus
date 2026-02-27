@@ -11,8 +11,18 @@ import cors from "cors";
 import fs from "fs";
 
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { connectDB } from "./mongodb";
+
+// Inline log so we never statically import ./vite (which pulls in @vitejs/plugin-react)
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 process.on("unhandledRejection", (reason) => {
   console.error("❌ Unhandled Rejection:", reason);
@@ -98,8 +108,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     const isDevelopment = nodeEnv === "development";
 
     if (isDevelopment) {
+      const { setupVite } = await import("./vite");
       await setupVite(app, server);
     } else if (process.env.API_ONLY !== "true") {
+      const { serveStatic } = await import("./vite");
       serveStatic(app);
     } else {
       log("[Startup] API-only mode — frontend served by Vercel");
