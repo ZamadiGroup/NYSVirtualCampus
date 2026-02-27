@@ -58,7 +58,7 @@ export default function AssignmentDetail({ assignment, onSubmit }: Props) {
       if (!assignmentId) return;
 
       const response = await submissionsApi.getMySubmissionStatus(assignmentId);
-      setSubmissionStatus(response);
+      setSubmissionStatus(response as SubmissionStatus);
     } catch (error) {
       console.error("Failed to load submission status:", error);
     } finally {

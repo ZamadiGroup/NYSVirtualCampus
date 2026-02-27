@@ -7,7 +7,7 @@ type GradeRecord = {
   assignmentId: string;
   assignmentTitle: string;
   studentName: string;
-  courseId: string;
+  courseId: string | { _id: string; title: string };
   score?: number;
   manualScore?: number;
   maxScore: number;
@@ -31,7 +31,7 @@ export default function TutorGrades({ grades, onUpdateManual }: Props) {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div>Student: {g.studentName}</div>
-              <div>Course: {g.courseId}</div>
+              <div>Course: {typeof g.courseId === "string" ? g.courseId : g.courseId.title}</div>
               <div>Status: {g.status}</div>
               <div>Score: {(g.score ?? g.manualScore ?? 0)} / {g.maxScore}</div>
               <div className="flex items-center gap-2 mt-2">

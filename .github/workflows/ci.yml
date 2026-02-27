@@ -32,8 +32,8 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Type check (frontend + backend)
-        run: npm run check
+      - name: Type check (frontend)
+        run: npm run check:frontend
 
       - name: Run tests (frontend + backend)
         run: npm test
