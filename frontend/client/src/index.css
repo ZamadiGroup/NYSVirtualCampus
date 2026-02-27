@@ -352,4 +352,62 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  @keyframes revealFadeUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 18px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes heroPan {
+    from {
+      transform: scale(1.05);
+    }
+    to {
+      transform: scale(1.1);
+    }
+  }
+
+  .reveal {
+    opacity: 0;
+    animation: revealFadeUp 0.8s ease forwards;
+  }
+
+  .reveal-delay-1 {
+    animation-delay: 0.12s;
+  }
+
+  .reveal-delay-2 {
+    animation-delay: 0.24s;
+  }
+
+  .reveal-delay-3 {
+    animation-delay: 0.36s;
+  }
+
+  .reveal-delay-4 {
+    animation-delay: 0.48s;
+  }
+
+  .hero-backdrop {
+    animation: heroPan 24s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+
+  .hero-backdrop {
+    animation: none;
+  }
 }
