@@ -28,6 +28,10 @@ jobs:
         working-directory: frontend
         run: npm install
 
+      - name: Remove local Vercel link (use secrets instead)
+        working-directory: frontend
+        run: rm -rf .vercel
+
       - name: Deploy to Vercel (production)
         working-directory: frontend
         run: npx vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
