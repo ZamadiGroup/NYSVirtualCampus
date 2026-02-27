@@ -1,10 +1,17 @@
 services:
   - type: web
-    name: nys-virtual-campus
+    name: nys-virtual-campus-backend
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
-    startCommand: cd backend && npx tsx server/index.ts
+    rootDir: backend
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: API_ONLY
+        value: "true"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

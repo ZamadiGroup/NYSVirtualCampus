@@ -99,8 +99,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
     if (isDevelopment) {
       await setupVite(app, server);
-    } else {
+    } else if (process.env.API_ONLY !== "true") {
       serveStatic(app);
+    } else {
+      log("[Startup] API-only mode — frontend served by Vercel");
     }
 
     const port = parseInt(process.env.PORT || "5000", 10);
