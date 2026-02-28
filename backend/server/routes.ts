@@ -865,8 +865,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pg = Math.max(1, parseInt(page, 10) || 1);
       const lim = Math.max(1, Math.min(200, parseInt(limit, 10) || 20));
-      const mongoose = require('mongoose');
-
       // Build query filters
       const query: any = {};
       
