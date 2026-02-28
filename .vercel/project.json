@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_G4susAnG9EoeRQhdoVF5nPuc4kHh",
+  "orgId": "team_VAQggt0wpR2Bd4o2q6x3lshh",
+  "projectName": "nysv-irtual-campus",
+  "settings": {
+    "createdAt": 1771060239273,
+    "framework": null,
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

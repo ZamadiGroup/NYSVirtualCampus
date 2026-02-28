@@ -1,21 +1,14 @@
-name: CI/CD
+name: Deploy to Vercel
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-  # ─── Deploy Frontend → Vercel ────────────────────────────────────────────────
-  # Required GitHub secrets:
-  #   VERCEL_TOKEN       – Personal Access Token (vercel.com/account/tokens)
-  #   VERCEL_ORG_ID      – found in .vercel/project.json after `vercel link`
-  #   VERCEL_PROJECT_ID  – found in .vercel/project.json after `vercel link`
-  deploy-frontend:
-    name: Deploy Frontend → Vercel
+  deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,41 +17,20 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel project settings
-        working-directory: frontend
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build
-        working-directory: frontend
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Deploy to Vercel (production)
-        working-directory: frontend
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-  # ─── Deploy Backend → Render ─────────────────────────────────────────────────
-  # Required GitHub secrets:
-  #   RENDER_API_KEY     – Render personal API key
-  #   RENDER_SERVICE_ID  – srv-d6gmglq4d50c73eq6uf0
-  deploy-backend:
-    name: Deploy Backend → Render
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Trigger Render deploy
+      # Rebuild the serverless bundle from latest TypeScript source
+      - name: Rebuild backend serverless bundle
+        working-directory: backend
         run: |
-          curl -fsSL -X POST \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys"
+          npm install
+          npx esbuild api/index.ts \
+            --bundle \
+            --platform=node \
+            --format=esm \
+            --packages=external \
+            --outfile=api/index.mjs
+
+      # Deploy source + fresh bundle to Vercel (Vercel builds the frontend).
+      # Project/org IDs are read from .vercel/project.json committed to the repo.
+      # Only VERCEL_TOKEN is required as a GitHub secret.
+      - name: Deploy to Vercel
+        run: npx vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}

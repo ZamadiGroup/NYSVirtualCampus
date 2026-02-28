@@ -1,5 +1,5 @@
 import React from 'react';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import nysLogo from '@assets/generated_images/NYS_Kenya_official_logo_4530e265.png';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,16 +10,22 @@ import { useAuth } from '@/lib/useAuth';
 
 export default function Header() {
   const { user, isAuthenticated, logout, refresh } = useAuth();
+  const { state } = useSidebar();
+  const sidebarCollapsed = state === 'collapsed';
 
   return (
     <header className="flex items-center justify-between gap-4 p-4 border-b-2 border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
       <div className="flex items-center gap-3">
         <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-green-800" />
-        <img src={nysLogo} alt="NYS Kenya" className="h-12 w-12 hidden md:block flex-shrink-0" />
-        <div className="hidden md:block">
-          <h2 className="font-bold text-lg text-white">NYS Virtual Campus</h2>
-          <p className="text-sm text-green-100">National Youth Service Kenya</p>
-        </div>
+        {sidebarCollapsed && (
+          <>
+            <img src={nysLogo} alt="NYS Kenya" className="h-12 w-12 hidden md:block flex-shrink-0" />
+            <div className="hidden md:block">
+              <h2 className="font-bold text-lg text-white">NYS Virtual Campus</h2>
+              <p className="text-sm text-green-100">National Youth Service Kenya</p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-4">

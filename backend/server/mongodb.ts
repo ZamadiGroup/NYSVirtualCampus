@@ -144,11 +144,11 @@ const enrollmentSchema = new mongoose.Schema({
   enrolledAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-// Export models
-export const User = mongoose.model('User', userSchema);
-export const Course = mongoose.model('Course', courseSchema);
-export const Assignment = mongoose.model('Assignment', assignmentSchema);
-export const Submission = mongoose.model('Submission', submissionSchema);
-export const Grade = mongoose.model('Grade', gradeSchema);
-export const Announcement = mongoose.model('Announcement', announcementSchema);
-export const Enrollment = mongoose.model('Enrollment', enrollmentSchema);
+// Export models — use cache guard to prevent "Cannot overwrite model" on warm Lambda invocations
+export const User = (mongoose.models['User'] as mongoose.Model<any>) || mongoose.model('User', userSchema);
+export const Course = (mongoose.models['Course'] as mongoose.Model<any>) || mongoose.model('Course', courseSchema);
+export const Assignment = (mongoose.models['Assignment'] as mongoose.Model<any>) || mongoose.model('Assignment', assignmentSchema);
+export const Submission = (mongoose.models['Submission'] as mongoose.Model<any>) || mongoose.model('Submission', submissionSchema);
+export const Grade = (mongoose.models['Grade'] as mongoose.Model<any>) || mongoose.model('Grade', gradeSchema);
+export const Announcement = (mongoose.models['Announcement'] as mongoose.Model<any>) || mongoose.model('Announcement', announcementSchema);
+export const Enrollment = (mongoose.models['Enrollment'] as mongoose.Model<any>) || mongoose.model('Enrollment', enrollmentSchema);
